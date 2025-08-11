@@ -1,0 +1,15 @@
+[package]
+name = "checkout_service"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+
+
+[lib]
+name = "checkout_service"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
+tarpc = { version = "0.34.0", features = ["full"] }
