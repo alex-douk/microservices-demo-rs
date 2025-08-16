@@ -1,0 +1,20 @@
+[package]
+name = "checkoutservice"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3.31"
+checkout_service = {version = "0.1.0", path = "../../services/checkout/"}
+tarpc = { version = "0.34.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
+cart_service = {version = "0.1.0", path = "../../services/cart/"}
+email_service = {version = "0.1.0", path = "../../services/email/"}
+productcatalog_service = {version = "0.1.0", path = "../../services/productcatalog/"}
+currency_service = {version = "0.1.0", path = "../../services/currency/"}
+payment_service = {version = "0.1.0", path = "../../services/payment/"}
+shipping_service = {version = "0.1.0", path = "../../services/shipping/"}
+uuid = { version = "1.18.0", features = ["v4"] }
