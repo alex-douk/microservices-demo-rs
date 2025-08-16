@@ -1,0 +1,18 @@
+[package]
+name = "paymentservice"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.99"
+card-validate = "2.4.0"
+chrono = "0.4.41"
+futures = "0.3.31"
+payment_service = {version = "0.1.0", path = "../../services/payment/"}
+tarpc = { version = "0.34.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
+uuid = { version = "1.18.0", features = ["v4"] }
+
