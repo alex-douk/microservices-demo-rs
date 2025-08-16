@@ -1,0 +1,16 @@
+[package]
+name = "adservice"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+ad_service = {version = "0.1.0", path = "../../services/ad/"}
+futures = "0.3.31"
+multimap = "0.10.1"
+tarpc = { version = "0.34.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
+
+[[bin]]
+name = "adservice"
+path = "src/server.rs"
