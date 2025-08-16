@@ -1,0 +1,9 @@
+[workspace]
+members=["src/adservice",
+"services/*", "src/currencyservice", "src/checkoutservice", "src/shippingservice", "src/paymentservice", "src/emailservice", "src/recommendationservice", "src/productcatalogservice", "src/cartservice", "crates/core_types", "src/frontend"]
+resolver="2"
+
+
+[workspace.package]
+authors = ["Alexandre Doukhan"]
+edition = "2021"
