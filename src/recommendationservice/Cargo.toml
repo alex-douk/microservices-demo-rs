@@ -1,0 +1,15 @@
+[package]
+name = "recommendationservice"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3.31"
+tarpc = { version = "0.34.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
+recommendation_service = {version = "0.1.0", path = "../../services/recommendation"}
+productcatalog_service = {version = "0.1.0", path = "../../services/productcatalog"}
+rand = "0.9.2"
