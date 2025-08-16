@@ -1,4 +1,7 @@
+use crate::types::{GetQuoteRequest, GetQuoteResponse, ShipOrderRequest, ShipOrderResponse};
+
 #[tarpc::service]
-pub trait SERVICE {
-    async fn test();
+pub trait ShippingService {
+    async fn get_quote(quote_req: GetQuoteRequest) -> GetQuoteResponse;
+    async fn ship_order(order: ShipOrderRequest) -> ShipOrderResponse;
 }

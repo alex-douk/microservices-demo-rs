@@ -1,13 +1,13 @@
 [package]
-name = "checkout_service"
+name = "productcatalog_service"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 
-
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "checkout_service"
+name = "productcatalog_service"
 path = "src/lib.rs"
 
 [dependencies]
