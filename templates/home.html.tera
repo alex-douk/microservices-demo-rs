@@ -1,0 +1,77 @@
+{# 
+ Copyright 2020 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+#}
+
+{% include "header.html.tera" %}
+
+<div {% if platform_css %} class="{{ platform_css }}" {% endif %}>
+  <span class="platform-flag">
+    {{ platform_name }}
+  </span>
+</div>
+
+<main role="main" class="home">
+
+  <!-- The image at the top of the home page, displayed on smaller screens. -->
+  <div class="home-mobile-hero-banner d-lg-none"></div>
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <!-- The image on the left of the home page, displayed on larger screens. -->
+      <!--<div class="col-4 d-none d-lg-block home-desktop-left-image"></div>-->
+      <!-- @TODO: removed temporarily. When uncommenting, also replace below div with this -->
+      <!--<div class="col-12 col-lg-8">-->
+
+      <div class="col-12 col-lg-12 px-10-percent">
+
+        <div class="row hot-products-row px-xl-6">
+
+          <div class="col-12">
+            <h3>Hot Products</h3>
+          </div>
+
+          {% for product in products %}
+          <div class="col-md-4 hot-product-card">
+            <a href="{{ base_url }}/product/{{ product.item.id }}">
+              <img loading="lazy" src="{{ base_url }}{{ product.item.picture }}">
+              <div class="hot-product-card-img-overlay"></div>
+            </a>
+            <div>
+              <div class="hot-product-card-name">{{ product.item.name }}</div>
+              <div class="hot-product-card-price">{{ render_money(product = product.price) }}</div>
+            </div>
+          </div>
+          {% endfor %}
+
+        </div>
+
+        <!-- Footer for larger screens. -->
+        <div class="row d-none d-lg-block home-desktop-footer-row">
+          <div class="col-12 p-0">
+            {% include "footer.html.tera" %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<!-- Footer for smaller screens. -->
+<div class="d-lg-none">
+{% include "footer.html.tera" %}
+</div>
