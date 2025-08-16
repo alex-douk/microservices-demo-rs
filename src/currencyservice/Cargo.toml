@@ -1,0 +1,20 @@
+[package]
+name = "currencyservice"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tarpc = { version = "0.34.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
+currency_service = {version = "0.1.0", path = "../../services/currency"}
+serde_json = { version = "1.0.142", features = ["preserve_order"] }
+anyhow = "1.0.98"
+futures = "0.3.31"
+
+
+[[bin]]
+name = "currencyservice"
+path = "src/server.rs"
