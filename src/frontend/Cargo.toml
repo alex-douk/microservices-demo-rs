@@ -1,0 +1,33 @@
+[package]
+name = "frontend"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ad_service = {version = "0.1.0", path = "../../services/ad"}
+recommendation_service = {version = "0.1.0", path = "../../services/recommendation"}
+productcatalog_service = {version = "0.1.0", path = "../../services/productcatalog"}
+cart_service = {version = "0.1.0", path = "../../services/cart"}
+shipping_service = {version = "0.1.0", path = "../../services/shipping"}
+currency_service = {version = "0.1.0", path = "../../services/currency"}
+checkout_service = {version = "0.1.0", path = "../../services/checkout"}
+tarpc = { version = "0.34.0", features = ["full"] }
+tokio = "1.47.1"
+serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
+serde_json = "1.0.142"
+uuid = { version = "1.18.0", features = ["v4"] }
+chrono = "0.4.41"
+rocket = { version = "0.5.1", features = ["serde_json"] }
+rocket_dyn_templates = { version = "0.2.0", features = ["tera"] }
+
+[dependencies.pest]
+version="=2.8.0"
+
+[dependencies.pest_meta]
+version="=2.8.0"
+
+[dependencies.pest_generator]
+version="=2.8.0"

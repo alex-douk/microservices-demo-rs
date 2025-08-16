@@ -1,0 +1,89 @@
+{# 
+ Copyright 2020 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+#}
+
+{% block product %}
+{% include "header.html.tera" %}
+
+<div {% if platform_css %} class="{{ platform_css }}" {% endif %}>
+  <span class="platform-flag">
+    {{ platform_name }}
+  </span>
+</div>
+
+<main role="main">
+  <div class="h-product container">
+    <div class="row">
+      <div class="col-md-6">
+        <img class="product-image" alt="" src="{{ base_url }}{{ product.item.picture }}" />
+      </div>
+      <div class="product-info col-md-5">
+        <div class="product-wrapper">
+
+          <h2>{{ product.item.name }}</h2>
+          <p class="product-price">{{ render_money(product = product.price) }}</p>
+          <p>{{ product.item.description }}</p>
+
+          {% if packaging_info %}
+          <div class="product-packaging">
+            <h3>Packaging</h3>
+            <span>
+              Weight: {% if packaging_info.weight %}{{ packaging_info.weight }}lb{% else %}n/a{% endif %}
+            </span>
+            <span>
+              Width: {% if packaging_info.width %}{{ packaging_info.width }}cm{% else %}n/a{% endif %}
+            </span>
+            <span>
+              Height: {% if packaging_info.height %}{{ packaging_info.height }}cm{% else %}n/a{% endif %}
+            </span>
+            <span>
+              Depth: {% if packaging_info.depth %}{{ packaging_info.depth }}cm{% else %}n/a{% endif %}
+            </span>
+          </div>
+          {% endif %}
+
+          <form method="POST" action="{{ base_url }}/cart">
+            <input type="hidden" name="product_id" value="{{ product.item.id }}" />
+            <div class="product-quantity-dropdown">
+              <select name="quantity" id="quantity">
+                <option>1</option>
+                <option>2</option>
+                <option>3</option>
+                <option>4</option>
+                <option>5</option>
+                <option>10</option>
+              </select>
+              <img src="{{ base_url }}/static/icons/Hipster_DownArrow.svg" alt="">
+            </div>
+            <button type="submit" class="cymbal-button-primary">Add To Cart</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    {% if recommendations %}
+      {% include "recommendations.html.tera" %}
+    {% endif %}
+  </div>
+  <div class="ad">
+    {% if ad %}
+      {% include "text_ad.html.tera" %}
+    {% endif %}
+  </div>
+</main>
+
+{% include "footer.html.tera" %}
+{% endblock product %}
