@@ -1,0 +1,5 @@
+[db_config]
+username="shipping"
+password="shipping_db"
+database="shipping_orders"
+prime=false

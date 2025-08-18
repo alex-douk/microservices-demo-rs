@@ -7,3 +7,6 @@ resolver="2"
 [workspace.package]
 authors = ["Alexandre Doukhan"]
 edition = "2021"
+
+[patch.crates-io]
+funty = { version = "1.2.0", git = "https://github.com/bitvecto-rs/funty/", rev = "7ef0d890fbcd8b3def1635ac1a877fc298488446" }

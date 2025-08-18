@@ -4,25 +4,42 @@ use shipping_service::{
     types::{GetQuoteResponse, Money, ShipOrderResponse},
 };
 
-use futures::StreamExt;
+use futures::{lock::Mutex, StreamExt};
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpListener;
 
 use futures::Future;
-use tarpc::serde_transport::new as new_transport;
 use std::{
     char,
     net::{IpAddr, Ipv4Addr},
+    sync::Arc,
 };
+use tarpc::serde_transport::new as new_transport;
 
+use crate::db::{backend::MySqlBackend, config::Config};
+
+mod db;
 mod quote;
 
 const SERVER_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50058);
 
 #[derive(Clone)]
-struct ShippingServer;
+struct ShippingServer(Arc<Mutex<MySqlBackend>>);
+impl ShippingServer {
+    fn new(config: Config) -> Self {
+        ShippingServer(Arc::new(Mutex::new(
+            MySqlBackend::new(
+                config.username.as_str(),
+                config.password.as_str(),
+                config.database.as_str(),
+                config.prime,
+            )
+            .expect("Couldn't connect to DB"),
+        )))
+    }
+}
 
 fn generate_fixed_length_number(nb_digits: u32) -> String {
     let rng = rand::rng();
@@ -31,7 +48,7 @@ fn generate_fixed_length_number(nb_digits: u32) -> String {
         .map(|e| e as u8 as char)
         .collect()
 }
-fn generate_tracking(salt: String) -> String {
+fn generate_tracking(salt: &String) -> String {
     let mut rng = rand::rng();
     let first_letter = rng.random_range(65..=90) as u8 as char;
     let second_letter = rng.random_range(65..=90) as u8 as char;
@@ -67,8 +84,24 @@ impl ShippingService for ShippingServer {
             "{}, {}, {}",
             order.address.street_address, order.address.city, order.address.state
         );
+
+        let tracking_id: String = generate_tracking(&salt);
+        let mut db_conn = self.0.lock().await;
+        let addr = order.address;
+        db_conn.insert(
+            "orders",
+            (
+                tracking_id.clone(),
+                addr.street_address,
+                addr.city,
+                addr.state,
+                addr.country,
+                addr.zip_code,
+            ),
+        );
+
         ShipOrderResponse {
-            tracking_id: generate_tracking(salt),
+            tracking_id: tracking_id,
         }
     }
 }
@@ -81,7 +114,8 @@ pub(crate) async fn wait_upon(fut: impl Future<Output = ()> + Send + 'static) {
 async fn main() {
     let listener = TcpListener::bind(&SERVER_ADDRESS).await.unwrap();
     let codec_builder = LengthDelimitedCodec::builder();
-    let server = ShippingServer;
+    let config = Config::new();
+    let server = ShippingServer::new(config);
 
     loop {
         let (stream, _) = listener.accept().await.unwrap();
