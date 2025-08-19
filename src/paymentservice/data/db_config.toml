@@ -1,0 +1,5 @@
+[db_config]
+username="payment"
+password="payment_db"
+database="payment_info"
+prime=false
