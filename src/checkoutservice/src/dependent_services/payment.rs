@@ -26,6 +26,7 @@ pub async fn charge_card(
     ctx: tarpc::context::Context,
     amount: Money,
     card: CreditCardInfo,
+    save_credit_info: bool
 ) -> Result<String, CreditCardError> {
     match PAYMENT_CLIENT.get() {
         Some(payment_client) => {
@@ -41,6 +42,7 @@ pub async fn charge_card(
                     payment_service::types::ChargeRequest {
                         amount,
                         credit_card: card,
+                        save_credit_info
                     },
                 )
                 .await

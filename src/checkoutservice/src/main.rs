@@ -38,7 +38,8 @@ impl CheckoutService for CheckoutServer {
         let cart = get_cart(context, order_req.user_id.clone()).await;
         let order =
             prepare_order(context, cart.items.clone(), order_req.user_currency.clone()).await;
-        let shipping_cost_usd = get_quote(context, order_req.address.clone(), cart.items.clone()).await;
+        let shipping_cost_usd =
+            get_quote(context, order_req.address.clone(), cart.items.clone()).await;
         let shipping_cost_localized =
             convert_currency(context, shipping_cost_usd, order_req.user_currency.clone()).await;
 
@@ -56,27 +57,31 @@ impl CheckoutService for CheckoutServer {
             .try_fold(total, |acc, cost| sum(&acc, &cost))
             // .try_reduce(|acc, cost| money::sum(&acc, &cost))
             .expect("Item price is malformed");
-        let _ = charge_card(context, total_price, order_req.credit_card).await.expect("Credit card error");
-
+        let _ = charge_card(
+            context,
+            total_price,
+            order_req.credit_card,
+            order_req.save_payment_info,
+        )
+        .await
+        .expect("Credit card error");
 
         let tracking_id = ship_order(context, order_req.address.clone(), cart.items).await;
 
         delete_cart(context, order_req.user_id).await;
-
 
         let order_result = OrderResult {
             order_id: uuid,
             shipping_tracking_id: tracking_id,
             shipping_cost: shipping_cost_localized,
             shipping_address: order_req.address,
-            items: order
+            items: order,
         };
-
 
         send_order_confirmation(context, order_req.email, order_result.clone()).await;
 
         PlaceOrderResponse {
-            result: order_result
+            result: order_result,
         }
     }
 }

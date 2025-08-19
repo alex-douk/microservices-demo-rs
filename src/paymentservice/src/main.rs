@@ -5,7 +5,6 @@ use futures::lock::Mutex;
 use futures::StreamExt;
 use payment_service::service::PaymentService;
 use payment_service::types::ChargeResponse;
-use std::char;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use tarpc::server::{BaseChannel, Channel};
@@ -58,19 +57,21 @@ impl PaymentService for PaymentServer {
             amount.nanos
         );
 
-        let mut db_conn = self.0.lock().await;
         let tx_id = Uuid::new_v4().to_string();
-        db_conn.insert(
-            "payments",
-            (
-                tx_id.clone(),
-                details.card_type,
-                charge.credit_card.credit_card_number,
-                charge.credit_card.credit_card_expiration_month,
-                charge.credit_card.credit_card_expiration_year,
-                charge.credit_card.credit_card_cvv.to_string(),
-            ),
-        );
+        if charge.save_credit_info {
+            let mut db_conn = self.0.lock().await;
+            db_conn.insert(
+                "payments",
+                (
+                    tx_id.clone(),
+                    details.card_type,
+                    charge.credit_card.credit_card_number,
+                    charge.credit_card.credit_card_expiration_month,
+                    charge.credit_card.credit_card_expiration_year,
+                    charge.credit_card.credit_card_cvv.to_string(),
+                ),
+            );
+        }
 
         Ok(ChargeResponse {
             transaction_id: tx_id,

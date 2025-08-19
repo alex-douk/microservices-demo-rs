@@ -162,6 +162,7 @@ pub struct CheckoutForm {
     credit_card_expiration_month: i32,
     credit_card_expiration_year: i32,
     credit_card_cvv: i32,
+    store_payment_info: bool
 }
 
 #[derive(serde::Serialize)]
@@ -204,6 +205,7 @@ pub async fn checkout(
         cc,
         session_id.clone(),
         user_currency.clone(),
+        checkout_form.store_payment_info
     )
     .await;
 

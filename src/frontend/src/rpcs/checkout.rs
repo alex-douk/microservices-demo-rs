@@ -28,6 +28,7 @@ pub async fn checkout(
     cc: CreditCardInfo,
     session_id: String,
     currency: String,
+    save_payment_info: bool
 ) -> checkout_service::types::OrderResult {
     match CHECKOUT_CLIENT.get() {
         Some(checkout_client) => {
@@ -37,6 +38,8 @@ pub async fn checkout(
                 address,
                 email,
                 credit_card: cc,
+                save_payment_info
+
             };
             checkout_client
                 .place_order(ctx, order)

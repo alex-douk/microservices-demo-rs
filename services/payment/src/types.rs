@@ -15,7 +15,8 @@ pub use microservices_core_types::CreditCardInfo;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChargeRequest {
     pub amount: Money,
-    pub credit_card: CreditCardInfo
+    pub credit_card: CreditCardInfo,
+    pub save_credit_info: bool
 }
 
 #[derive(Serialize, Deserialize, Debug)]

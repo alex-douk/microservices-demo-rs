@@ -7,8 +7,8 @@ pub struct PlaceOrderRequest {
     pub user_currency: String,
     pub address: Address,
     pub email: String,
-    pub credit_card: CreditCardInfo
-
+    pub credit_card: CreditCardInfo,
+    pub save_payment_info: bool
 }
 
 
