@@ -83,10 +83,16 @@ impl AdService for AdServer {
         _context: ::tarpc::context::Context,
         request: ad_service::types::AdRequest,
     ) -> ad_service::types::AdResponse {
+        println!("Getting ads based on zipcode {:06}", request.zip_code);
         let ads = request
             .context_keys
             .iter()
-            .map(|context_key| self.ads_map.get_vec(context_key).unwrap().clone())
+            .map(|context_key| {
+                self.ads_map
+                    .get_vec(context_key)
+                    .cloned()
+                    .unwrap_or_else(|| Vec::new())
+            })
             .flatten()
             .collect::<Vec<_>>();
 
@@ -101,7 +107,7 @@ pub(crate) async fn wait_upon(fut: impl Future<Output = ()> + Send + 'static) {
 #[tokio::main]
 async fn main() {
     let server = AdServer::new();
-    let addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), 8081);
+    let addr = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50051);
     let listener = TcpListener::bind(&addr).await.unwrap();
     let codec_builder = LengthDelimitedCodec::builder();
 

@@ -1,16 +1,19 @@
 use ad_service::service::AdServiceClient;
+use ad_service::types::Ad;
 use cart_service::types::Cart;
+use rand::rng;
+use rand::seq::{IndexedRandom, SliceRandom};
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync:: OnceLock;
+use std::sync::OnceLock;
+use tarpc::serde_transport::new as new_transport;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
-use tarpc::serde_transport::new as new_transport;
 
-static AD_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 5000);
+static AD_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50051);
 static AD_CLIENT: OnceLock<AdServiceClient> = OnceLock::new();
 
-pub(super) async fn initialize_cart_client() {
+pub(super) async fn initialize_ad_client() {
     let codec_builder = LengthDelimitedCodec::builder();
     let stream = TcpStream::connect(&AD_ADDRESS).await.unwrap();
     let transport = new_transport(codec_builder.new_framed(stream), Json::default());
@@ -21,35 +24,27 @@ pub(super) async fn initialize_cart_client() {
     }
 }
 
-
-// pub async fn get_cart(ctx: tarpc::context::Context, user_id: String) -> Cart {
-//     match ad.get() {
-//         Some(cart_client) => cart_client
-//             .get_cart(ctx, cart_service::types::GetCartRequest { user_id })
-//             .await
-//             .expect("Couldn't connect to cart client"),
-//         None => unreachable!("Cart Client should have been initialized before calling its API"),
-//     }
-// }
-//
-// pub async fn delete_cart(ctx: tarpc::context::Context, user_id: String) {
-//     match CART_CLIENT.get() {
-//         Some(cart_client) => cart_client
-//             .empty_cart(ctx, cart_service::types::EmptyCartRequest { user_id })
-//             .await
-//             .expect("Couldn't connect to cart client"),
-//         None => unreachable!("Cart Client should have been initialized before calling its API"),
-//     }
-// }
-
-// pub async fn add_item(ctx: tarpc::context::Context, user_id: String, item: CartItem) {
-//     match CART_CLIENT.get() {
-//         Some(cart_client) => cart_client
-//             .add_item(ctx, cart_service::types::AddItemRequest { user_id, item })
-//             .await
-//             .expect("Couldn't connect to cart client"),
-//         None => unreachable!("Cart Client should have been initialized before calling its API"),
-//     }
-// }
-
-
+pub async fn get_ad(
+    ctxt: tarpc::context::Context,
+    context_words: Vec<String>,
+    zip_code: i32,
+) -> Option<Ad> {
+    match AD_CLIENT.get() {
+        Some(ad_client) => {
+            let ads = ad_client
+                .get_ads(
+                    ctxt,
+                    ad_service::types::AdRequest {
+                        context_keys: context_words,
+                        zip_code,
+                    },
+                )
+                .await
+                .unwrap()
+                .ads;
+            let mut random = rng();
+            ads.choose(&mut random).cloned()
+        }
+        None => unreachable!("Ad Client should have been initialized before calling its API"),
+    }
+}

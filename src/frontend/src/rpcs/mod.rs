@@ -8,7 +8,7 @@ pub mod shipping;
 
 
 pub async fn init_services() {
-    // ad::initialize_email_client().await;
+    ad::initialize_ad_client().await;
     cart::initialize_cart_client().await;
     catalog::initialize_catalog_client().await;
     checkout::initialize_checkout_client().await;

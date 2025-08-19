@@ -12,14 +12,14 @@ use serde_json::Value;
 use crate::{
     middleware::{SharedRenderingContext, COOKIE_CURRENCY},
     rpcs::{
-        cart::get_cart, catalog::{get_product, list_products}, currency::{convert_currency, get_currencies}, recommendation::list_recommendations
+        ad::get_ad, cart::get_cart, catalog::{get_product, list_products}, currency::{convert_currency, get_currencies}, recommendation::list_recommendations
     },
     utils::{cart_size, user_session_id, ProductView},
 };
 
 #[derive(serde::Serialize)]
 struct ProductContext {
-    ad: Ad,
+    ad: Option<Ad>,
     show_currencies: bool,
     product: ProductView,
     recommendations: Vec<Product>,
@@ -48,10 +48,8 @@ pub async fn product_detail(
 
 
     let context = ProductContext {
-        ad: Ad {
-            redirect_url: "https://youtube.com".to_string(),
-            text: "AN INCREDIBLE friend WEBSITE TO VISIT".to_string(),
-        },
+
+        ad: get_ad(t_ctx, product_view.item.categories.clone(), 00000).await,
         product: product_view,
         show_currencies: true,
         recommendations,

@@ -8,9 +8,7 @@ use serde_json::Value;
 use crate::{
     middleware::{SharedRenderingContext, COOKIE_CURRENCY},
     rpcs::{
-        cart::get_cart,
-        catalog::{get_product, list_products},
-        currency::{convert_currency, get_currencies},
+        ad::get_ad, cart::get_cart, catalog::{get_product, list_products}, currency::{convert_currency, get_currencies}
     },
     utils::{self, cart_size, user_session_id, ProductView},
 };
@@ -23,7 +21,7 @@ struct HomeContext {
     products: Vec<ProductView>,
     cart_size: i32,
     banner_color: String,
-    ad: Ad,
+    ad: Option<Ad>,
 }
 ///Route for the main page.
 ///Google's OnlineBoutique implementation supports both GET and HEAD requests.
@@ -61,10 +59,7 @@ pub async fn home(
         products: products_localized,
         cart_size: cart_size(&cart.items),
         banner_color: "".to_string(),
-        ad: Ad {
-            redirect_url: "https://youtube.com".to_string(),
-            text: "AN INCREDIBLE friend WEBSITE TO VISIT".to_string(),
-        },
+        ad: get_ad(t_ctx, Vec::new(), 00000).await
     };
 
     let full_context = template_context.extend_with_handler_context(context);

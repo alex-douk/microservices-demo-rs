@@ -3,6 +3,7 @@ use tarpc::serde::{Serialize, Deserialize};
 pub struct AdRequest {
     // List of important key words from the current page describing the context.
     pub context_keys: Vec<String>,
+    pub zip_code: i32
 }
 
 #[derive(Serialize, Deserialize, Debug)]
