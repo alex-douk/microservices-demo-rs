@@ -1,0 +1,5 @@
+[db_config]
+username="checkout"
+password="checkout_db"
+database="checkout_orders"
+prime=false

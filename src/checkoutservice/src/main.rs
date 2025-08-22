@@ -1,17 +1,22 @@
 use checkout_service::service::CheckoutService;
 use checkout_service::types::PlaceOrderResponse;
-use email_service::types::{Money, OrderResult};
+use email_service::types::{Money, OrderItem, OrderResult};
 use futures::StreamExt;
+use mysql::serde_json;
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::Arc;
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use futures::Future;
 use tarpc::serde_transport::new as new_transport;
 
+use crate::db::backend::MySqlBackend;
+use crate::db::config::Config;
 use crate::dependent_services::cart::{delete_cart, get_cart};
 use crate::dependent_services::catalog::prepare_order;
 use crate::dependent_services::currency::convert_currency;
@@ -20,13 +25,52 @@ use crate::dependent_services::payment::charge_card;
 use crate::dependent_services::shipping::{get_quote, ship_order};
 use crate::money::sum;
 
+mod db;
 mod dependent_services;
 mod money;
 
 static SERVER_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50059);
 
 #[derive(Clone)]
-struct CheckoutServer;
+struct CheckoutServer(Arc<Mutex<MySqlBackend>>);
+
+fn store_order_to_db(
+    db_conn: &mut MySqlBackend,
+    order_id: &str,
+    items: Vec<OrderItem>,
+    tx_id: &str,
+    tracking_id: &str,
+) {
+    let formated_items = items
+        .iter()
+        .map(|item: &OrderItem| {
+            let str_price = serde_json::to_string(&item.cost).expect("Couldn't serialize price");
+            (
+                None::<u8>,
+                order_id,
+                item.item.product_id.to_string(),
+                item.item.quantity,
+                str_price,
+            )
+        })
+        .collect::<Vec<_>>();
+    db_conn.insert("checkout_orders", (order_id, tx_id, tracking_id));
+    db_conn.multiple_insert("ordered_items", formated_items);
+}
+
+impl CheckoutServer {
+    fn new(config: Config) -> Self {
+        CheckoutServer(Arc::new(Mutex::new(
+            MySqlBackend::new(
+                config.username.as_str(),
+                config.password.as_str(),
+                config.database.as_str(),
+                config.prime,
+            )
+            .expect("Couldn't connect to DB"),
+        )))
+    }
+}
 
 impl CheckoutService for CheckoutServer {
     async fn place_order(
@@ -57,7 +101,7 @@ impl CheckoutService for CheckoutServer {
             .try_fold(total, |acc, cost| sum(&acc, &cost))
             // .try_reduce(|acc, cost| money::sum(&acc, &cost))
             .expect("Item price is malformed");
-        let _ = charge_card(
+        let tx_id = charge_card(
             context,
             total_price,
             order_req.credit_card,
@@ -67,6 +111,15 @@ impl CheckoutService for CheckoutServer {
         .expect("Credit card error");
 
         let tracking_id = ship_order(context, order_req.address.clone(), cart.items).await;
+
+        let mut db_conn = self.0.lock().await;
+        store_order_to_db(
+            &mut *db_conn,
+            uuid.as_str(),
+            order.clone(),
+            tx_id.as_str(),
+            tracking_id.as_str(),
+        );
 
         delete_cart(context, order_req.user_id).await;
 
@@ -97,7 +150,8 @@ async fn main() {
     dependent_services::init_services().await;
     let listener = TcpListener::bind(&SERVER_ADDRESS).await.unwrap();
     let codec_builder = LengthDelimitedCodec::builder();
-    let server = CheckoutServer;
+    let config = Config::new();
+    let server = CheckoutServer::new(config);
 
     loop {
         let (stream, _) = listener.accept().await.unwrap();
