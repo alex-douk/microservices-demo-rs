@@ -6,6 +6,13 @@ The services communicate via [`tarpc`](https://github.com/google/tarpc), an RPC 
 
 The fronting webserver is written in [Rocket](https://rocket.rs/).
 
+To make the application slightly more compelling and realistic in terms of sensitive information usage, we augment the baseline application to store orders and payment information.
+Each relevant service only stores the relevant information required for their local processing:
+    - The payment service now stores a transaction ID with the amounts. If the user wants to, they can store their payment information for future use.
+    - The shipping service stores the package tracking number and the associated address.
+    - The checkout service stores the order, comprised of its cart contents, and the associated transactionId and trackingId.
+
+Additionally, we allow for ads to be targeted based on the user's address for targeted content.
 
 # Advisory
 
