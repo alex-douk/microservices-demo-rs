@@ -8,6 +8,8 @@ edition.workspace = true
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
+alohomora.workspace=true
+tahini_tarpc.workspace=true
 
 [lib]
 name = "microservices_core_types"
