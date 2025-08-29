@@ -1,8 +1,11 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
+use alohomora::SesameType;
 use tarpc::serde::{Deserialize, Serialize};
 
 
 
-pub use microservices_core_types::Money;
+pub use microservices_core_types::{Money, MoneyOut};
 // // Represents an amount of money with its currency type.
 // #[derive(Serialize, Deserialize, Debug)]
 // pub struct Money {
@@ -24,12 +27,12 @@ pub use microservices_core_types::Money;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetSupportedCurrenciesResponse {
-    pub currency_codes: Vec<String>
+    pub currency_codes: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, SesameType)]
 pub struct CurrencyConversionRequest {
     pub from: Money,
     // The 3-letter currency code defined in ISO 4217.
-    pub to_code: String
+    pub to_code: BBox<String, NoPolicy>,
 }

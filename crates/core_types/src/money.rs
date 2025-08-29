@@ -1,6 +1,9 @@
 use std::fmt::Display;
-
-use crate::Money;
+use alohomora::bbox::BBox;
+use alohomora::fold::fold;
+use alohomora::policy::{AnyPolicyDyn, NoPolicy, Specializable};
+use alohomora::pure::{execute_pure, PrivacyPureRegion};
+use crate::{Money, MoneyOut};
 
 const MIN_NANO: i32 = -999_999_999;
 const MAX_NANO: i32 = 999_999_999;
@@ -25,72 +28,78 @@ impl Display for MoneyErrors {
 
 impl std::error::Error for MoneyErrors {}
 
-pub fn sign_matches(m: &Money) -> bool {
-    m.nanos == 0 || m.units == 0 || (m.nanos < 0) == (m.units < 0)
+fn sign_matches(units: i64, nanos: i32) -> bool {
+    nanos == 0 || units == 0 || (nanos < 0) == (units < 0)
 }
 
-pub fn valid_nanos(nanos: i32) -> bool {
+fn valid_nanos(nanos: i32) -> bool {
     MIN_NANO <= nanos && nanos <= MAX_NANO
 }
 
-pub fn is_valid(m: &Money) -> bool {
-    valid_nanos(m.nanos) && sign_matches(m)
+fn is_valid(units: i64, nanos: i32) -> bool {
+    valid_nanos(nanos) && sign_matches(units, nanos)
 }
 
-pub fn is_positive(m: Money) -> bool {
-    is_valid(&m) && m.units > 0 || (m.units == 0 && m.nanos > 0)
+fn is_positive(units: i64, nanos: i32) -> bool {
+    is_valid(units, nanos) && units > 0 || (units == 0 && nanos > 0)
 }
 
-pub fn is_negative(m: Money) -> bool {
-    is_valid(&m) && m.units < 0 || (m.units == 0 && m.nanos < 0)
+fn is_negative(units: i64, nanos: i32) -> bool {
+    is_valid(units, nanos) && units < 0 || (units == 0 && nanos < 0)
 }
 
-pub fn are_same_currency(l: &Money, r: &Money) -> bool {
-    l.currency_code == r.currency_code && l.currency_code != ""
+fn are_same_currency(l: &str, r: &str) -> bool {
+    l == r && l != ""
 }
 
-pub fn are_equal(l: &Money, r: &Money) -> bool {
-    l.currency_code == r.currency_code && l.units == r.units && l.nanos == r.nanos
-}
-
-pub fn negate(m: Money) -> Money {
+fn negate(m: Money) -> Money {
     Money {
         currency_code: m.currency_code,
-        units: -m.units,
-        nanos: -m.nanos,
+        units: m.units.into_ppr(PrivacyPureRegion::new(|units: i64| -units)),
+        nanos: m.nanos.into_ppr(PrivacyPureRegion::new(|nanos: i32| -nanos)),
     }
 }
 
 pub fn sum(l: &Money, r: &Money) -> Result<Money, MoneyErrors> {
-    if let false = (is_valid(&l) || is_valid(&r)) {
-        return Err(MoneyErrors::InvalidValue);
-    }
-    if let false = are_same_currency(&l, &r) {
-        return Err(MoneyErrors::MismatchingCurrency);
-    }
+    let result = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
+        (l.clone(), r.clone()),
+        PrivacyPureRegion::new(|(l, r): (MoneyOut, MoneyOut)| {
+            if let false = (is_valid(l.units, l.nanos) || is_valid(r.units, r.nanos)) {
+                return Err(MoneyErrors::InvalidValue);
+            }
+            if let false = are_same_currency(&l.currency_code, &r.currency_code) {
+                return Err(MoneyErrors::MismatchingCurrency);
+            }
 
-    let mut units = l.units + r.units;
-    let mut nanos = l.nanos + r.nanos;
+            let mut units = l.units + r.units;
+            let mut nanos = l.nanos + r.nanos;
 
-    if (units == 0 && nanos == 0) || (units > 0 && nanos >= 0) || (units < 0 && nanos <= 0) {
-        //same sign <units, nanos>
-        units += (nanos / NANOS_MOD) as i64;
-        nanos = nanos % NANOS_MOD;
-    } else {
-        // different sign. nanos guaranteed to not to go over the limit
-        if units > 0 {
-            units -= 1;
-            nanos += NANOS_MOD;
-        } else {
-            units += 1;
-            nanos -= NANOS_MOD;
-        }
-    }
-    Ok(Money {
-        units,
-        nanos,
-        currency_code: l.currency_code.clone(),
-    })
+            if (units == 0 && nanos == 0) || (units > 0 && nanos >= 0) || (units < 0 && nanos <= 0) {
+                //same sign <units, nanos>
+                units += (nanos / NANOS_MOD) as i64;
+                nanos = nanos % NANOS_MOD;
+            } else {
+                // different sign. nanos guaranteed to not to go over the limit
+                if units > 0 {
+                    units -= 1;
+                    nanos += NANOS_MOD;
+                } else {
+                    units += 1;
+                    nanos -= NANOS_MOD;
+                }
+            }
+            Ok(MoneyOut {
+                units,
+                nanos,
+                currency_code: l.currency_code,
+            })
+        })
+    );
+
+    let result = result.unwrap();
+    let result = result.specialize_policy::<NoPolicy>().unwrap();
+    let result = result.fold_in()?;
+    Ok(Money::from(result))
 }
 
 pub fn slow_multiply(m: &Money, n: i32) -> Money {

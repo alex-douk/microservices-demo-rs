@@ -1,13 +1,13 @@
 use card_validate;
 use chrono::Datelike;
-use payment_service::types::{CreditCardError, CreditCardInfo};
+use payment_service::types::{CreditCardError, CreditCardInfoOut};
 
 pub(super) struct CreditCardDetails {
     pub end_numbers: String,
     pub card_type: String,
 }
 pub(super) fn validate_card(
-    credit_card: CreditCardInfo,
+    credit_card: CreditCardInfoOut,
 ) -> Result<CreditCardDetails, CreditCardError> {
     let validate = card_validate::Validate::from(&credit_card.credit_card_number.as_str())
         .map_err(|_| CreditCardError::InvalidCreditCard)?;
@@ -23,8 +23,8 @@ pub(super) fn validate_card(
     }
 }
 
-fn verify_expiration(credit_card: CreditCardInfo) -> Result<String, CreditCardError> {
-    let CreditCardInfo {
+fn verify_expiration(credit_card: CreditCardInfoOut) -> Result<String, CreditCardError> {
+    let CreditCardInfoOut {
         credit_card_number,
         credit_card_expiration_month: month,
         credit_card_expiration_year: year,

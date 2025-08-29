@@ -10,6 +10,7 @@ futures = "0.3.31"
 multimap = "0.10.1"
 tarpc = { version = "0.34.0", features = ["full"] }
 tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
+alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }
 
 [[bin]]
 name = "adservice"

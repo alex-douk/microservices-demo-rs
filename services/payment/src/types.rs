@@ -1,8 +1,10 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::serde::{Serialize, Deserialize};
 
 
 
-pub use microservices_core_types::CreditCardInfo;
+pub use microservices_core_types::{CreditCardInfo, CreditCardInfoOut};
 
 // #[derive(Serialize, Deserialize, Debug)]
 // pub struct CreditCardInfo {
@@ -16,12 +18,12 @@ pub use microservices_core_types::CreditCardInfo;
 pub struct ChargeRequest {
     pub amount: Money,
     pub credit_card: CreditCardInfo,
-    pub save_credit_info: bool
+    pub save_credit_info: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChargeResponse {
-    pub transaction_id: String
+    pub transaction_id: BBox<String, NoPolicy>,
 }
 
 

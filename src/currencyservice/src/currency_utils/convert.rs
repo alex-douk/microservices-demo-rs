@@ -7,7 +7,7 @@ use std::{
 const FRACTION_SIZE: f64 = (1 * 10i32.pow(9)) as f64;
 const CONVERSION_PATH: &str = "data/currency_conversion.json";
 
-use currency_service::types::Money;
+use currency_service::types::MoneyOut;
 use serde_json;
 
 pub struct ConversionTable {
@@ -20,7 +20,7 @@ impl ConversionTable {
         Self { table }
     }
 
-    pub fn convert(&self, money: Money, to_code: String) -> Money {
+    pub fn convert(&self, money: MoneyOut, to_code: String) -> MoneyOut {
         let exchange_rate = self
             .table
             .get(&money.currency_code)
@@ -35,7 +35,7 @@ impl ConversionTable {
         let (dst_units, dst_nanos) =
             carry_nanos(euro_units * target_exchange, euro_nanos * target_exchange);
 
-        Money {
+        MoneyOut {
             currency_code: to_code,
             units: dst_units.floor() as i64,
             nanos: dst_nanos.floor() as i32,

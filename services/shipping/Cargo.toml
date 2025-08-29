@@ -14,3 +14,4 @@ path = "src/lib.rs"
 serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
 tarpc = { version = "0.34.0", features = ["full"] }
 microservices_core_types = {version = "0.1.0", path = "../../crates/core_types/"}
+alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }

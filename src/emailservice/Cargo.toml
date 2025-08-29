@@ -12,3 +12,4 @@ tarpc = { version = "0.34.0", features = ["full"] }
 tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "libc", "tokio-macros", "macros", "rt-multi-thread"] }
 email_service = {version = "0.1.0", path = "../../services/email"}
 minijinja = "2.11.0"
+alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }

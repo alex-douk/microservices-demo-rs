@@ -16,8 +16,11 @@ use std::{
     net::{IpAddr, Ipv4Addr},
     sync::Arc,
 };
+use alohomora::bbox::BBox;
+use alohomora::policy::{AnyPolicyDyn, NoPolicy};
+use alohomora::pure::{execute_pure, PrivacyPureRegion};
 use tarpc::serde_transport::new as new_transport;
-
+use shipping_service::types::{AddressOut, ShipOrderRequestOut};
 use crate::db::{backend::MySqlBackend, config::Config};
 
 mod db;
@@ -69,9 +72,9 @@ impl ShippingService for ShippingServer {
     ) -> shipping_service::types::GetQuoteResponse {
         let quote: quote::Quote = 0i32.into();
         let money = Money {
-            currency_code: "USD".to_string(),
-            units: quote.dollars as i64,
-            nanos: (quote.cents * 10_000_000) as i32,
+            currency_code: BBox::new("USD".to_string(), NoPolicy {}),
+            units: BBox::new(quote.dollars as i64, NoPolicy {}),
+            nanos: BBox::new((quote.cents * 10_000_000) as i32, NoPolicy {}),
         };
         GetQuoteResponse { cost_usd: money }
     }
@@ -80,12 +83,17 @@ impl ShippingService for ShippingServer {
         _context: tarpc::context::Context,
         order: shipping_service::types::ShipOrderRequest,
     ) -> shipping_service::types::ShipOrderResponse {
-        let salt = format!(
-            "{}, {}, {}",
-            order.address.street_address, order.address.city, order.address.state
-        );
+        let tracking_id = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
+            order.address.clone(),
+            PrivacyPureRegion::new(|address: AddressOut| {
+                let salt = format!(
+                    "{}, {}, {}",
+                    address.street_address, address.city, address.state
+                );
+                generate_tracking(&salt)
+            })
+        ).unwrap().specialize_policy().unwrap();
 
-        let tracking_id: String = generate_tracking(&salt);
         let mut db_conn = self.0.lock().await;
         let addr = order.address;
         db_conn.insert(
@@ -98,11 +106,12 @@ impl ShippingService for ShippingServer {
                 addr.country,
                 addr.zip_code,
             ),
+            // Need to receive context from tarpc.
+            // Do some kind of From tarpc::context::Context -> Context<ContextData>.
+            todo!(),
         );
 
-        ShipOrderResponse {
-            tracking_id: tracking_id,
-        }
+        ShipOrderResponse { tracking_id }
     }
 }
 

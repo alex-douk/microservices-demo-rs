@@ -1,41 +1,60 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
+use alohomora::pure::PrivacyPureRegion;
+use alohomora::SesameType;
 use tarpc::serde::{Serialize, Deserialize};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, SesameType)]
+#[alohomora_out_type(to_derive = [Serialize, Deserialize, Debug, Clone])]
 pub struct Product {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub picture: String,
+    pub id: BBox<String, NoPolicy>,
+    pub name: BBox<String, NoPolicy>,
+    pub description: BBox<String, NoPolicy>,
+    pub picture: BBox<String, NoPolicy>,
     pub price_usd: Money,
-    pub categories : Vec<String>
+    pub categories : BBox<Vec<String>, NoPolicy>,
+}
+
+impl Product {
+    pub fn from(out: BBox<ProductOut, NoPolicy>) -> Product {
+        Product {
+            id: out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.id)),
+            name: out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.name)),
+            description: out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.description)),
+            picture: out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.picture)),
+            price_usd: Money::from(out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.price_usd))),
+            categories: out.into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.categories)),
+        }
+    }
 }
 
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ListProductResponse {
-    pub products: Vec<Product>
+    pub products: Vec<ProductOut>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetProductRequest {
-    pub id: String
+    pub id: BBox<String, NoPolicy>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SearchProductRequest {
-    pub query: String
+    pub query: BBox<String, NoPolicy>,
 }
 
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SearchProductResponse {
-    pub results: Vec<Product>
+    pub results: BBox<Vec<ProductOut>, NoPolicy>
 }
 //==================REIMPLEMENTING FOREIGN TYPES=================
 
 
 pub use microservices_core_types::Money;
+use microservices_core_types::MoneyOut;
 // //FROM CURRENCY
 // // Represents an amount of money with its currency type.
 // #[derive(Serialize, Deserialize, Debug, Clone)]

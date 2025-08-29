@@ -1,14 +1,16 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::serde::{Serialize, Deserialize};
 
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlaceOrderRequest {
-    pub user_id: String,
-    pub user_currency: String,
+    pub user_id: BBox<String, NoPolicy>,
+    pub user_currency: BBox<String, NoPolicy>,
     pub address: Address,
-    pub email: String,
+    pub email: BBox<String, NoPolicy>,
     pub credit_card: CreditCardInfo,
-    pub save_payment_info: bool
+    pub save_payment_info: BBox<bool, NoPolicy>,
 }
 
 

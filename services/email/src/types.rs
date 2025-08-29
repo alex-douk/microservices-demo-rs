@@ -1,6 +1,8 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::serde::{Deserialize, Serialize};
 
-pub use microservices_core_types::OrderResult;
+pub use microservices_core_types::{OrderResult, OrderResultOut};
 // #[derive(Serialize, Deserialize, Debug)]
 // pub struct OrderResult {
 //     pub order_id: String,
@@ -20,7 +22,7 @@ pub use microservices_core_types::OrderItem;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SendOrderConfirmationRequest {
-    pub email: String,
+    pub email: BBox<String, NoPolicy>,
     pub order: OrderResult,
 }
 
