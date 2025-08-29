@@ -1,10 +1,10 @@
+use alohomora::bbox::{BBox, BBoxRender};
+use alohomora::policy::NoPolicy;
+use alohomora::pure::PrivacyPureRegion;
+use alohomora::rocket::{get, BBoxCookieJar, BBoxRedirect, BBoxTemplate};
 use ad_service::types::Ad;
-use rocket::{
-    figment::util, http::{ContentType, CookieJar}, response::{content::RawHtml, Redirect, Responder}, route, uri, Request
-};
-use rocket_dyn_templates::{Metadata, Template};
-use serde_json::Value;
-
+use currency_service::types::Money;
+use productcatalog_service::types::Product;
 use crate::{
     middleware::{SharedRenderingContext, COOKIE_CURRENCY},
     rpcs::{
@@ -13,44 +13,56 @@ use crate::{
     utils::{self, cart_size, user_session_id, ProductView},
 };
 
-#[derive(serde::Serialize)]
+#[derive(BBoxRender)]
 struct HomeContext {
     show_currency: bool,
     currencies: Vec<String>,
     base_url: String,
     products: Vec<ProductView>,
-    cart_size: i32,
+    cart_size: BBox<i32, NoPolicy>,
     banner_color: String,
-    ad: Option<Ad>,
+    ad: BBox<Option<Ad>, NoPolicy>,
 }
 ///Route for the main page.
 ///Google's OnlineBoutique implementation supports both GET and HEAD requests.
 ///Rocket [routing logic](https://rocket.rs/guide/v0.5/requests/#methods) automatically derives
 ///HEAD request routing if the path supports GET requests.
-#[route(GET, uri = "/")]
+#[get("/")]
 pub async fn home(
     template_context: SharedRenderingContext,
-    cookie_jar: &CookieJar<'_>,
-) -> (ContentType, Template) {
+    cookie_jar: BBoxCookieJar<'_, '_>,
+) -> BBoxTemplate {
     let t_ctx = tarpc::context::current();
     let currencies = get_currencies(t_ctx).await;
 
-    let current_currency = utils::current_user_currency(cookie_jar);
+    let current_currency = utils::current_user_currency(&cookie_jar);
 
     let products = list_products(t_ctx).await;
 
-    let cart = get_cart(t_ctx, user_session_id(cookie_jar)).await;
+    let cart = get_cart(t_ctx, user_session_id(&cookie_jar)).await;
 
     let mut products_localized: Vec<ProductView> = Vec::with_capacity(products.len());
 
     for product in products.into_iter() {
+        let money_usd = Money::from(BBox::new(product.price_usd.clone(), NoPolicy {}));
         let localized_price =
-            convert_currency(t_ctx, product.price_usd.clone(), current_currency.clone()).await;
+            convert_currency(t_ctx, money_usd, current_currency.clone()).await;
         products_localized.push(ProductView {
-            item: product,
+            item: Product::from(BBox::new(product, NoPolicy {})),
             price: localized_price,
         });
     }
+
+    let ad = get_ad(
+        t_ctx,
+        BBox::new(Vec::new(), NoPolicy {}),
+        BBox::new(00000, NoPolicy {})
+    ).await;
+
+    let ad = match ad {
+        Some(ad) => ad.into_ppr(PrivacyPureRegion::new(Option::Some)),
+        None => BBox::new(None, NoPolicy {}),
+    };
 
     let context = HomeContext {
         show_currency: true,
@@ -59,23 +71,20 @@ pub async fn home(
         products: products_localized,
         cart_size: cart_size(&cart.items),
         banner_color: "".to_string(),
-        ad: get_ad(t_ctx, Vec::new(), 00000).await
+        ad
     };
 
     let full_context = template_context.extend_with_handler_context(context);
-    (
-        ContentType::HTML,
-        Template::render("home.html.tera", full_context),
-    )
+    BBoxTemplate::render::<_, _, ()>("home.html.tera", &full_context, todo!())
 }
 
 
-#[route(GET, uri = "/checkout")]
+#[get("/checkout")]
 pub fn logout(
-    cookie_jar: &CookieJar<'_>
-) -> Redirect {
+    cookie_jar: BBoxCookieJar<'_, '_>
+) -> BBoxRedirect {
     for cookie in cookie_jar.iter() {
-        cookie_jar.remove(cookie.clone());
+        cookie_jar.remove(cookie_jar.get::<NoPolicy>(cookie).unwrap());
     }
-    Redirect::found(uri!("/"))
+    BBoxRedirect::to2("/")
 }

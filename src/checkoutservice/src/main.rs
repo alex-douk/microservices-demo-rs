@@ -5,6 +5,9 @@ use futures::StreamExt;
 use mysql::serde_json;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
+use alohomora::bbox::BBox;
+use alohomora::policy::{AnyPolicyCloneDyn, AnyPolicyDyn, NoPolicy};
+use alohomora::pure::{execute_pure, PrivacyPureRegion};
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -23,11 +26,11 @@ use crate::dependent_services::currency::convert_currency;
 use crate::dependent_services::email::send_order_confirmation;
 use crate::dependent_services::payment::charge_card;
 use crate::dependent_services::shipping::{get_quote, ship_order};
-use crate::money::sum;
+
+use microservices_core_types::{money, MoneyOut, OrderItemOut};
 
 mod db;
 mod dependent_services;
-mod money;
 
 static SERVER_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50059);
 
@@ -36,26 +39,36 @@ struct CheckoutServer(Arc<Mutex<MySqlBackend>>);
 
 fn store_order_to_db(
     db_conn: &mut MySqlBackend,
-    order_id: &str,
+    order_id: BBox<String, NoPolicy>,
     items: Vec<OrderItem>,
-    tx_id: &str,
-    tracking_id: &str,
+    tx_id: BBox<String, NoPolicy>,
+    tracking_id: BBox<String, NoPolicy>,
 ) {
     let formated_items = items
-        .iter()
-        .map(|item: &OrderItem| {
-            let str_price = serde_json::to_string(&item.cost).expect("Couldn't serialize price");
+        .into_iter()
+        .map(|item: OrderItem| {
             (
                 None::<u8>,
-                order_id,
-                item.item.product_id.to_string(),
+                order_id.clone(),
+                item.item.product_id,
                 item.item.quantity,
-                str_price,
+                execute_pure::<dyn AnyPolicyCloneDyn, _, _, _>(
+                    item.cost,
+                    PrivacyPureRegion::new(
+                        |cost: MoneyOut| {
+                            serde_json::to_string(&cost).expect("Couldn't serialize price")
+                        }
+                    ),
+                ).unwrap(),
             )
         })
         .collect::<Vec<_>>();
-    db_conn.insert("checkout_orders", (order_id, tx_id, tracking_id));
-    db_conn.multiple_insert("ordered_items", formated_items);
+
+    // TODO(babman): Need to provide context.
+    db_conn.insert("checkout_orders", (order_id, tx_id, tracking_id), todo!());
+    for item in formated_items {
+        db_conn.insert("ordered_items", item, todo!());
+    }
 }
 
 impl CheckoutServer {
@@ -78,7 +91,8 @@ impl CheckoutService for CheckoutServer {
         context: tarpc::context::Context,
         order_req: checkout_service::types::PlaceOrderRequest,
     ) -> checkout_service::types::PlaceOrderResponse {
-        let uuid = Uuid::new_v4().to_string();
+        let uuid = BBox::new(Uuid::new_v4().to_string(), NoPolicy {});
+
         let cart = get_cart(context, order_req.user_id.clone()).await;
         let order =
             prepare_order(context, cart.items.clone(), order_req.user_currency.clone()).await;
@@ -88,19 +102,18 @@ impl CheckoutService for CheckoutServer {
             convert_currency(context, shipping_cost_usd, order_req.user_currency.clone()).await;
 
         let mut total = Money {
-            units: 0,
-            nanos: 0,
+            units: BBox::new(0, NoPolicy {}),
+            nanos: BBox::new(0, NoPolicy {}),
             currency_code: order_req.user_currency,
         };
 
         total = money::sum(&total, &shipping_cost_localized).expect("Shipping costs are malformed");
         let total_price = order
             .iter()
-            // .iter_mut()
-            .map(|order_item| money::slow_multiply(&order_item.cost, order_item.item.quantity))
-            .try_fold(total, |acc, cost| sum(&acc, &cost))
-            // .try_reduce(|acc, cost| money::sum(&acc, &cost))
+            .map(|order_item| money::slow_multiply(&order_item.cost, order_item.item.quantity.clone()))
+            .try_fold(total, |acc, cost| money::sum(&acc, &cost))
             .expect("Item price is malformed");
+
         let tx_id = charge_card(
             context,
             total_price,
@@ -115,10 +128,10 @@ impl CheckoutService for CheckoutServer {
         let mut db_conn = self.0.lock().await;
         store_order_to_db(
             &mut *db_conn,
-            uuid.as_str(),
+            uuid.clone(),
             order.clone(),
-            tx_id.as_str(),
-            tracking_id.as_str(),
+            tx_id,
+            tracking_id.clone(),
         );
 
         delete_cart(context, order_req.user_id).await;

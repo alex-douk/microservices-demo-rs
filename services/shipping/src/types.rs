@@ -1,3 +1,6 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
+use alohomora::SesameType;
 use tarpc::serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -13,7 +16,7 @@ pub struct GetQuoteResponse {
 }
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, SesameType)]
 pub struct ShipOrderRequest {
     pub address: Address,
     pub items: Vec<CartItem>
@@ -21,11 +24,11 @@ pub struct ShipOrderRequest {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ShipOrderResponse {
-    pub tracking_id: String
+    pub tracking_id: BBox<String, NoPolicy>,
 }
 
 
-pub use microservices_core_types::Address;
+pub use microservices_core_types::{Address, AddressOut};
 
 // #[derive(Serialize, Deserialize, Debug)]
 // pub struct Address {

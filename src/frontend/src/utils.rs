@@ -1,31 +1,46 @@
+use alohomora::bbox::{BBox, BBoxRender};
+use alohomora::policy::{AnyPolicyDyn, NoPolicy};
+use alohomora::pure::{execute_pure, PrivacyPureRegion};
+use alohomora::rocket::BBoxCookieJar;
+
 use crate::middleware::{COOKIE_CURRENCY, COOKIE_SESSION_ID};
 use cart_service::types::CartItem;
 use currency_service::types::Money;
 use productcatalog_service::types::Product;
-use rocket::http::CookieJar;
 
-pub fn current_user_currency(cookie_jar: &CookieJar<'_>) -> String {
-    let currency_currency = match cookie_jar.get(COOKIE_CURRENCY) {
-        Some(cookie) => cookie.value().to_string(),
-        None => "USD".to_string(),
-    };
-    currency_currency
+
+pub fn current_user_currency(cookie_jar: &BBoxCookieJar<'_, '_>) -> BBox<String, NoPolicy> {
+    match cookie_jar.get(COOKIE_CURRENCY) {
+        Some(cookie) => cookie.value().to_owned(),
+        None => BBox::new("USD".to_string(), NoPolicy {}),
+    }
 }
 
-#[derive(serde::Serialize)]
+#[derive(BBoxRender)]
 pub struct ProductView {
     pub item: Product,
     pub price: Money,
 }
 
-pub fn user_session_id(cookie_jar: &CookieJar<'_>) -> String {
-    let session_id = match cookie_jar.get(COOKIE_SESSION_ID) {
-        Some(cookie) => cookie.value().to_string(),
-        None => "".to_string(),
-    };
-    session_id
+pub fn user_session_id(cookie_jar: &BBoxCookieJar<'_, '_>) -> BBox<String, NoPolicy> {
+    match cookie_jar.get(COOKIE_SESSION_ID) {
+        Some(cookie) => cookie.value().to_owned(),
+        None => BBox::new("".to_string(), NoPolicy {}),
+    }
 }
 
-pub fn cart_size(cart: &Vec<CartItem>) -> i32 {
-    cart.iter().map(|e| e.quantity).fold(0, |acc, e| acc + e) 
+pub fn cart_size(cart: &Vec<CartItem>) -> BBox<i32, NoPolicy> {
+    let default = BBox::new(0, NoPolicy {});
+    cart.iter().map(|e| e.quantity.clone()).fold(
+        default,
+        |acc, e| {
+            let sum = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
+                (acc, e.clone()),
+                PrivacyPureRegion::new(|(acc, e): (i32, i32)| {
+                    acc + e
+                })
+            ).unwrap();
+            sum.specialize_policy().unwrap()
+        }
+    )
 }

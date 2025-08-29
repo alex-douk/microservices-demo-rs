@@ -5,6 +5,8 @@ use rand::rng;
 use rand::seq::{IndexedRandom, SliceRandom};
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::serde_transport::new as new_transport;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -26,9 +28,9 @@ pub(super) async fn initialize_ad_client() {
 
 pub async fn get_ad(
     ctxt: tarpc::context::Context,
-    context_words: Vec<String>,
-    zip_code: i32,
-) -> Option<Ad> {
+    context_words: BBox<Vec<String>, NoPolicy>,
+    zip_code: BBox<i32, NoPolicy>,
+) -> Option<BBox<Ad, NoPolicy>> {
     match AD_CLIENT.get() {
         Some(ad_client) => {
             let ads = ad_client
@@ -42,8 +44,9 @@ pub async fn get_ad(
                 .await
                 .unwrap()
                 .ads;
+
             let mut random = rng();
-            ads.choose(&mut random).cloned()
+            ads.fold_in().choose(&mut random).cloned()
         }
         None => unreachable!("Ad Client should have been initialized before calling its API"),
     }

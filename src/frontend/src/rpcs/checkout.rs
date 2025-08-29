@@ -2,6 +2,8 @@ use checkout_service::service::CheckoutServiceClient;
 use checkout_service::types::{Address, CreditCardInfo, PlaceOrderRequest};
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::serde_transport::new as new_transport;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -24,10 +26,10 @@ pub(super) async fn initialize_checkout_client() {
 pub async fn checkout(
     ctx: tarpc::context::Context,
     address: Address,
-    email: String,
+    email: BBox<String, NoPolicy>,
     cc: CreditCardInfo,
-    session_id: String,
-    currency: String,
+    session_id: BBox<String, NoPolicy>,
+    currency: BBox<String, NoPolicy>,
     save_payment_info: bool
 ) -> checkout_service::types::OrderResult {
     match CHECKOUT_CLIENT.get() {

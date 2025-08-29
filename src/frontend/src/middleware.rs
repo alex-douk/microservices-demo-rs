@@ -1,12 +1,12 @@
-use std::{collections::HashMap, convert::Infallible};
-
-use chrono::{Datelike, NaiveDate};
+use std::convert::Infallible;
+use alohomora::bbox::{BBox, BBoxRender, Renderable};
+use alohomora::policy::NoPolicy;
+use alohomora::pure::PrivacyPureRegion;
+use alohomora::rocket::{BBoxRequest, BBoxRequestOutcome, FromBBoxRequest};
+use chrono::{Datelike};
 use rocket::{
     fairing::{Fairing, Kind},
-    http::{Cookie, Status},
-    outcome::Outcome,
-    request::FromRequest,
-    time::macros::utc_datetime,
+    http::{Cookie},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -31,68 +31,70 @@ impl Fairing for EnsureSessionId {
         }
     }
 
-    async fn on_request(&self, req: &mut rocket::Request<'_>, data: &mut rocket::Data<'_>) {
+    async fn on_request(&self, req: &mut rocket::Request<'_>, _data: &mut rocket::Data<'_>) {
         let cookie_jar = req.cookies();
         if let None = cookie_jar.get(COOKIE_SESSION_ID) {
             //Bound to session
-            cookie_jar
-                .add(Cookie::build((COOKIE_SESSION_ID, Uuid::new_v4().to_string())).expires(None));
+            cookie_jar.add(
+                Cookie::build(COOKIE_SESSION_ID, Uuid::new_v4().to_string()).finish()
+            );
         }
     }
 }
 
-pub struct RequestId(pub String);
+pub struct RequestId(pub BBox<String, NoPolicy>);
 
 #[rocket::async_trait]
-impl<'r> FromRequest<'r> for RequestId {
-    type Error = Infallible;
+impl<'a, 'r> FromBBoxRequest<'a, 'r> for RequestId {
+    type BBoxError = Infallible;
 
-    async fn from_request(
-        _request: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
-        Outcome::Success(RequestId(Uuid::new_v4().to_string()))
+    async fn from_bbox_request(request: BBoxRequest<'a, 'r>) -> BBoxRequestOutcome<Self, Self::BBoxError> {
+        let uuid = Uuid::new_v4().to_string();
+        let policy = NoPolicy {};
+        BBoxRequestOutcome::Success(RequestId(BBox::new(uuid, policy)))
     }
 }
 
 
-#[derive(Serialize, Clone)]
+#[derive(BBoxRender, Clone)]
 pub struct SharedRenderingContext {
-    session_id: Option<String>,
-    request_id: String,
-    user_currency: String,
+    session_id: BBox<Option<String>, NoPolicy>,
+    request_id: BBox<String, NoPolicy>,
+    user_currency: BBox<String, NoPolicy>,
     platform_css: String,
     platform_name: String,
     is_cymbal_brand: bool,
     assistant_enabled: bool,
-    //We purposefully do not fill deployment details
+    // We purposefully do not fill deployment details
     frontend_message: String,
-    current_year: i32,
+    current_year: BBox<i32, NoPolicy>,
     base_url: String,
 }
 
 #[rocket::async_trait]
-impl<'r> FromRequest<'r> for SharedRenderingContext {
-    type Error = Infallible;
+impl<'a, 'r> FromBBoxRequest<'a, 'r> for SharedRenderingContext {
+    type BBoxError = Infallible;
 
-    async fn from_request(
-        request: &'r rocket::Request<'_>,
-    ) -> rocket::request::Outcome<Self, Self::Error> {
+    async fn from_bbox_request(request: BBoxRequest<'a, 'r>) -> BBoxRequestOutcome<Self, Self::BBoxError> {
         let cookie_jar = request.cookies();
-        let session_id = cookie_jar.get(COOKIE_SESSION_ID);
+        let session_id = match cookie_jar.get(COOKIE_SESSION_ID) {
+            None => BBox::new(None, NoPolicy {}),
+            Some(cookie) => cookie.value().to_owned().into_ppr(PrivacyPureRegion::new(Option::Some)),
+        };
 
         let request_id = request
             .guard::<RequestId>()
             .await
             .expect("RequestId should never fail");
         let currency = match cookie_jar.get(COOKIE_CURRENCY) {
-            None => DEFAULT_CURRENCY.to_string(),
-            Some(currency_cookie) => currency_cookie.value().to_string(),
+            None => BBox::new(DEFAULT_CURRENCY.to_string(), NoPolicy {}),
+            Some(currency_cookie) => currency_cookie.value().to_owned(),
         };
 
         //We have a static baseUrl
         let base_url = "".to_string();
         let context = SharedRenderingContext {
-            session_id: session_id.map(|c| c.value().to_string()),
+            session_id,
             request_id: request_id.0,
             user_currency: currency,
             platform_css: "aws".to_string(),
@@ -101,59 +103,38 @@ impl<'r> FromRequest<'r> for SharedRenderingContext {
             //No LLM here
             assistant_enabled: false,
             frontend_message: "Welcome to my awesome site".to_string(),
-            current_year: chrono::Utc::now().year(),
+            current_year: BBox::new(chrono::Utc::now().year(), NoPolicy {}),
             base_url,
         };
-        Outcome::Success(context)
+        BBoxRequestOutcome::Success(context)
+    }
+}
+
+pub struct MyRender<T: BBoxRender>(
+    pub SharedRenderingContext,
+    pub T,
+);
+impl<T: BBoxRender> BBoxRender for MyRender<T> {
+    fn render(&self) -> Renderable {
+        let mut this_map = if let Renderable::Dict(map) = self.1.render() {
+            map
+        } else {
+            unreachable!("Self rendering context was not a JSON map");
+        };
+
+        let local_context_map = if let Renderable::Dict(map) = self.1.render() {
+            map
+        } else {
+            unreachable!("Local rendering context was not a JSON map");
+        };
+
+        this_map.extend(local_context_map);
+        Renderable::Dict(this_map)
     }
 }
 
 impl SharedRenderingContext {
-    pub fn extend_with_handler_context<T: Serialize>(self, local_context: T) -> Map<String, Value> {
-        let local_context_val =
-            serde_json::to_value(local_context).expect("Couldn't serialize the local context");
-
-        if let Value::Object(map) = local_context_val {
-            let mut total_context = self.build_self_map_with_added_capacity(map.len());
-            // let map = Map::from_iter(local_context.into_iter());
-            total_context.extend(map.into_iter());
-            return total_context;
-        }
-        unreachable!("Local rendering context was not a JSON map")
-    }
-
-    fn build_self_map_with_added_capacity(self, bonus_capacity: usize) -> Map<String, Value> {
-        let mut total_context = Map::with_capacity(10 + bonus_capacity);
-        if let Some(session_id) = self.session_id {
-            total_context.insert("session_id".to_string(), Value::String(session_id));
-        }
-        total_context.insert("request_id".to_string(), Value::String(self.request_id));
-        total_context.insert(
-            "user_currency".to_string(),
-            Value::String(self.user_currency),
-        );
-        total_context.insert("platform_css".to_string(), Value::String(self.platform_css));
-        total_context.insert(
-            "platform_name".to_string(),
-            Value::String(self.platform_name),
-        );
-        total_context.insert(
-            "is_cymbal_brand".to_string(),
-            Value::Bool(self.is_cymbal_brand),
-        );
-        total_context.insert(
-            "assistant_enabled".to_string(),
-            Value::Bool(self.assistant_enabled),
-        );
-        total_context.insert(
-            "frontend_message".to_string(),
-            Value::String(self.frontend_message),
-        );
-        total_context.insert(
-            "current_year".to_string(),
-            Value::Number(self.current_year.into()),
-        );
-        total_context.insert("base_url".to_string(), Value::String(self.base_url));
-        total_context
+    pub fn extend_with_handler_context<T: BBoxRender>(self, local_context: T) -> MyRender<T> {
+        MyRender(self, local_context)
     }
 }

@@ -1,10 +1,14 @@
 use cart_service::service::CartService;
 
-use cart_service::types::Cart;
+use cart_service::types::{Cart, CartItem};
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, RwLock};
+use alohomora::bbox::BBox;
+use alohomora::pcr::{execute_pcr, PrivacyCriticalRegion, Signature};
+use alohomora::policy::{AnyPolicy, AnyPolicyDyn, NoPolicy};
+use alohomora::pure::{execute_pure, PrivacyPureRegion};
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -16,6 +20,8 @@ use tarpc::serde_transport::new as new_transport;
 #[derive(Clone)]
 struct CartServer {
     //You'd think there's a TTL on the cache, but apparently not(!!!)
+    // TODO(babman): the key is the user id, which is BBoxed.
+    //               meaning that writing (not reading) to the map is a PCR.
     cache: Arc<RwLock<HashMap<String, Cart>>>,
 }
 
@@ -39,10 +45,15 @@ impl CartService for CartServer {
             .cache
             .read()
             .expect("Couldn't acquire read lock. Cache is poisoned");
-        match cache_read.get(&get_cart_req.user_id) {
-            None => Cart::new(get_cart_req.user_id),
-            Some(cart) => cart.clone(),
-        }
+        let cart = get_cart_req.user_id.clone().into_ppr(PrivacyPureRegion::new(|user_id: String| {
+            match cache_read.get(&user_id) {
+                None => Cart::new(get_cart_req.user_id),
+                Some(cart) => cart.clone(),
+            }
+        }));
+        // TODO(babman): this might give us a headachen when policies are real.
+        //               we might need an API to flatten BBoxs by doing conjunction on their policies.
+        cart.discard_box()
     }
 
     async fn empty_cart(
@@ -54,9 +65,18 @@ impl CartService for CartServer {
             .cache
             .write()
             .expect("Couldn't acquire write lock. Cache is poisoned");
-        cache_write.insert(
-            empty_cart_req.user_id.clone(),
-            Cart::new(empty_cart_req.user_id),
+
+        empty_cart_req.user_id.into_pcr(
+            PrivacyCriticalRegion::new(
+                |user_id: String, _: NoPolicy, _c: ()| {
+                cache_write.remove(&user_id)
+                },
+                Signature {
+                    username: "",
+                    signature: ""
+                }
+            ),
+            ()
         );
     }
 
@@ -69,27 +89,66 @@ impl CartService for CartServer {
             .cache
             .write()
             .expect("Couldn't acquire write lock. Cache is poisoned");
-        match write_lock.get_mut(&add_item_req.user_id) {
-            //If no cart for the current user, create a new cart with only the requested item
-            None => {
-                let mut new_cart = Cart::new(add_item_req.user_id.clone());
-                new_cart.items.push(add_item_req.item);
-                write_lock.insert(add_item_req.user_id, new_cart);
-            }
-            Some(cart) => {
-                //If cart already exists, check if item is in cart and increase its count. If not,
-                //create new entry
-                match cart
-                    .items
-                    .iter_mut()
-                    .find(|item| item.product_id == add_item_req.item.product_id)
-                {
-                    None => cart.items.push(add_item_req.item),
-                    Some(item) => item.quantity += add_item_req.item.quantity,
+
+        let (user_id, item) = (add_item_req.user_id, add_item_req.item);
+        user_id.into_pcr(
+            PrivacyCriticalRegion::new(
+                |user_id: String, p: NoPolicy, _c: ()| {
+                    match write_lock.get_mut(&user_id) {
+                        //If no cart for the current user, create a new cart with only the requested item
+                        None => {
+                            let mut new_cart = Cart::new(BBox::new(user_id.clone(), p));
+                            new_cart.items.push(item);
+                            write_lock.insert(user_id, new_cart);
+                        }
+                        Some(cart) => {
+                            // If cart already exists, check if item is in cart and increase its count. If not,
+                            // create new entry
+                            let old_item = cart
+                                .items
+                                .iter_mut()
+                                .find(|curent_item| {
+                                    helper(curent_item, &item)
+                                });
+
+                            match old_item {
+                                None => cart.items.push(item),
+                                Some(old_item) => {
+                                    old_item.quantity = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
+                                        (old_item.quantity.clone(), item.quantity),
+                                        PrivacyPureRegion::new(|(q1, q2): (i32, i32)| {
+                                            q1 + q2
+                                        })
+                                    ).unwrap().specialize_policy().unwrap();
+                                }
+                            }
+                        }
+                    }
+                },
+                Signature {
+                    username: "",
+                    signature: ""
                 }
-            }
-        }
+            ),
+            ()
+        );
     }
+}
+
+fn helper(item1: &CartItem, item2: &CartItem) -> bool {
+    execute_pcr::<dyn AnyPolicyDyn, _, _, _, _>(
+        (item1.product_id.clone(), item2.product_id.clone()),
+        PrivacyCriticalRegion::new(
+            |(pid1, pid2): (String, String), _: AnyPolicy, _: ()| {
+                pid1 == pid2
+            },
+            Signature {
+                username: "",
+                signature: ""
+            }
+        ),
+        ()
+    ).unwrap()
 }
 
 pub(crate) async fn wait_upon(fut: impl Future<Output = ()> + Send + 'static) {

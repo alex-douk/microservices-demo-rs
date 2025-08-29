@@ -2,6 +2,8 @@ use currency_service::service::CurrencyServiceClient;
 use currency_service::types::Money;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -24,7 +26,7 @@ pub(super) async fn initialize_currency_client() {
 pub async fn convert_currency(
     ctx: tarpc::context::Context,
     from: Money,
-    user_currency: String,
+    user_currency: BBox<String, NoPolicy>,
 ) -> Money {
     match CURRENCY_CLIENT.get() {
         None => unreachable!("Currency Client should have been initialized before calling its API"),

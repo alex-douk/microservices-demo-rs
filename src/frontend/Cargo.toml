@@ -7,6 +7,7 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+either = "1.10.0"
 ad_service = {version = "0.1.0", path = "../../services/ad"}
 recommendation_service = {version = "0.1.0", path = "../../services/recommendation"}
 productcatalog_service = {version = "0.1.0", path = "../../services/productcatalog"}
@@ -20,9 +21,11 @@ serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
 serde_json = "1.0.142"
 uuid = { version = "1.18.0", features = ["v4"] }
 chrono = "0.4.41"
-rocket = { version = "0.5.1", features = ["serde_json"] }
-rocket_dyn_templates = { version = "0.2.0", features = ["tera"] }
 rand = "0.9.2"
+alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }
+rocket = { git = "https://github.com/KinanBab/Rocket.git", branch = "main", features= ["json"] }
+rocket_dyn_templates = { git = "https://github.com/KinanBab/Rocket.git", branch = "main", features= ["tera"] }
+#rocket_dyn_templates = { version = "0.2.0", features = ["tera"] }
 
 [dependencies.pest]
 version="=2.8.0"

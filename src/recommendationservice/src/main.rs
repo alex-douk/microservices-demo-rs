@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use std::hash::RandomState;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, OnceLock};
+use alohomora::pure::PrivacyPureRegion;
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -16,6 +17,7 @@ use tokio::net::{TcpListener, TcpStream};
 
 use futures::Future;
 use tarpc::serde_transport::new as new_transport;
+use productcatalog_service::types::ProductOut;
 
 static CATALOG_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50053);
 static CATALOG_CLIENT: OnceLock<ProductCatalogServiceClient> = OnceLock::new();
@@ -42,6 +44,7 @@ impl RecommendationService for RecommendationServer {
         request: recommendation_service::types::ListRecommendationsRequest,
     ) -> recommendation_service::types::ListRecommendationsResponse {
         let max_responses = 5;
+
         //fetch list of products from product catalog stub
         let catalog = CATALOG_CLIENT
             .get()
@@ -50,19 +53,26 @@ impl RecommendationService for RecommendationServer {
             .await
             .expect("Couldn't get the catalog")
             .products;
-        let hash_set: HashSet<String, RandomState> = HashSet::from_iter(request.product_ids);
-        let sampled_ids = catalog
-            .into_iter()
-            .map(|prod| prod.id)
-            .filter(|prod_id| !hash_set.contains(prod_id))
-            .collect::<Vec<_>>();
-        let nb_samples = min(max_responses, sampled_ids.len());
-        let mut rng = rand::rng();
+
+        let recommended_ids = request.product_ids.into_ppr(PrivacyPureRegion::new(|product_ids: Vec<String>| {
+            let hash_set: HashSet<String, RandomState> = HashSet::from_iter(product_ids);
+
+            let sampled_ids = catalog
+                .into_iter()
+                .map(|prod| prod.id)
+                .filter(|prod_id| !hash_set.contains(prod_id))
+                .collect::<Vec<_>>();
+            let nb_samples = min(max_responses, sampled_ids.len());
+            let mut rng = rand::rng();
+
+            sampled_ids
+                .into_iter()
+                .choose_multiple(&mut rng, nb_samples)
+        }));
+
 
         ListRecommendationsResponse {
-            product_ids: sampled_ids
-                .into_iter()
-                .choose_multiple(&mut rng, nb_samples),
+            product_ids: recommended_ids,
         }
     }
 }

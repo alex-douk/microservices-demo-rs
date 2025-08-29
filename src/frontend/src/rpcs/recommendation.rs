@@ -4,6 +4,8 @@ use recommendation_service::service::RecommendationServiceClient;
 use std::cmp::min;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -27,8 +29,8 @@ pub(super) async fn initialize_recommendation_client() {
 
 pub async fn list_recommendations(
     ctx: tarpc::context::Context,
-    user_id: String,
-    product_ids: Vec<String>,
+    user_id: BBox<String, NoPolicy>,
+    product_ids: BBox<Vec<String>, NoPolicy>,
 ) -> Vec<Product> {
     match RECOMMENDATION_CLIENT.get() {
         None => unreachable!("Catalog Client should have been initialized before calling its API"),
@@ -44,6 +46,7 @@ pub async fn list_recommendations(
                 .await
                 .expect("Couldn't connect to catalog client")
                 .product_ids
+                .fold_in()
                 .into_iter()
                 .take(4);
 

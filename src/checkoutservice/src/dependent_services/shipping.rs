@@ -4,6 +4,8 @@ use email_service::types::Money;
 use shipping_service::service::ShippingServiceClient;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -27,7 +29,7 @@ pub async fn ship_order(
     ctx: tarpc::context::Context,
     address: Address,
     items: Vec<CartItem>,
-) -> String {
+) -> BBox<String, NoPolicy> {
     match SHIPPING_CLIENT.get() {
         None => unreachable!("Shipping Client should have been initialized before calling its API"),
         Some(shipping_client) => {

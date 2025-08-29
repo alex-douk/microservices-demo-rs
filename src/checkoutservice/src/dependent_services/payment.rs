@@ -3,6 +3,8 @@ use payment_service::service::PaymentServiceClient;
 use payment_service::types::{CreditCardError, Money};
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -27,7 +29,7 @@ pub async fn charge_card(
     amount: Money,
     card: CreditCardInfo,
     save_credit_info: bool
-) -> Result<String, CreditCardError> {
+) -> Result<BBox<String, NoPolicy>, CreditCardError> {
     match PAYMENT_CLIENT.get() {
         Some(payment_client) => {
             // let credit_card: PaymentCreditCardInfo = PaymentCreditCardInfo {

@@ -2,6 +2,8 @@ use cart_service::service::CartServiceClient;
 use cart_service::types::{Cart, CartItem};
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync:: OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -21,7 +23,7 @@ pub(super) async fn initialize_cart_client() {
     }
 }
 
-pub async fn get_cart(ctx: tarpc::context::Context, user_id: String) -> Cart {
+pub async fn get_cart(ctx: tarpc::context::Context, user_id: BBox<String, NoPolicy>) -> Cart {
     match CART_CLIENT.get() {
         Some(cart_client) => cart_client
             .get_cart(ctx, cart_service::types::GetCartRequest { user_id })
@@ -31,7 +33,7 @@ pub async fn get_cart(ctx: tarpc::context::Context, user_id: String) -> Cart {
     }
 }
 
-pub async fn delete_cart(ctx: tarpc::context::Context, user_id: String) {
+pub async fn delete_cart(ctx: tarpc::context::Context, user_id: BBox<String, NoPolicy>) {
     match CART_CLIENT.get() {
         Some(cart_client) => cart_client
             .empty_cart(ctx, cart_service::types::EmptyCartRequest { user_id })
@@ -41,7 +43,7 @@ pub async fn delete_cart(ctx: tarpc::context::Context, user_id: String) {
     }
 }
 
-pub async fn add_item(ctx: tarpc::context::Context, user_id: String, product_id: String, quantity: i32) {
+pub async fn add_item(ctx: tarpc::context::Context, user_id: BBox<String, NoPolicy>, product_id: BBox<String, NoPolicy>, quantity: BBox<i32, NoPolicy>) {
     let item =  CartItem {
         product_id,
         quantity

@@ -1,3 +1,6 @@
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
+use alohomora::SesameType;
 use tarpc::serde::{Deserialize, Serialize};
 
 
@@ -10,28 +13,29 @@ pub use microservices_core_types::CartItem;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AddItemRequest {
-    pub user_id: String,
+    pub user_id: BBox<String, NoPolicy>,
     pub item: CartItem,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EmptyCartRequest {
-    pub user_id: String,
+    pub user_id: BBox<String, NoPolicy>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetCartRequest {
-    pub user_id: String,
+    pub user_id: BBox<String, NoPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, SesameType)]
+#[alohomora_out_type(to_derive = [Clone])]
 pub struct Cart {
-    pub user_id: String,
+    pub user_id: BBox<String, NoPolicy>,
     pub items: Vec<CartItem>,
 }
 
 impl Cart {
-    pub fn new(user_id: String) -> Self {
+    pub fn new(user_id: BBox<String, NoPolicy>) -> Self {
         Cart {
             user_id,
             items: Vec::new()

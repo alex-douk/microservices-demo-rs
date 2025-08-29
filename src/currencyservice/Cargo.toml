@@ -13,7 +13,7 @@ currency_service = {version = "0.1.0", path = "../../services/currency"}
 serde_json = { version = "1.0.142", features = ["preserve_order"] }
 anyhow = "1.0.98"
 futures = "0.3.31"
-
+alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }
 
 [[bin]]
 name = "currencyservice"

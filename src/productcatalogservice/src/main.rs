@@ -1,7 +1,7 @@
 use productcatalog_service::service::ProductCatalogService;
 
 use futures::StreamExt;
-use productcatalog_service::types::{ListProductResponse, Product, SearchProductResponse};
+use productcatalog_service::types::{ListProductResponse, Product, ProductOut, SearchProductResponse};
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -15,12 +15,13 @@ use std::fs::File;
 use std::io::BufReader;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
+use alohomora::pure::PrivacyPureRegion;
 
 static SERVER_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50053);
 
 #[derive(Clone)]
 struct ProductCatalogServer {
-    catalog: Arc<Vec<Product>>,
+    catalog: Arc<Vec<ProductOut>>,
 }
 
 impl ProductCatalogServer {
@@ -31,7 +32,7 @@ impl ProductCatalogServer {
     pub fn new() -> Self {
         let catalog_file = File::open("products.json").expect("Couldn't find catalog file");
         let reader = BufReader::new(catalog_file);
-        let mut catalog: HashMap<String, Vec<Product>> =
+        let mut catalog: HashMap<String, Vec<ProductOut>> =
             serde_json::from_reader(reader).expect("Couldn't parse the catalog");
         let products = catalog.remove(&"products".to_string()).expect("Couldn't find products in the catalog");
 
@@ -56,11 +57,14 @@ impl ProductCatalogService for ProductCatalogServer {
         _context: tarpc::context::Context,
         request: productcatalog_service::types::GetProductRequest,
     ) -> Product {
-        if let Some(prod) = self.catalog.iter().find(|prod| prod.id == request.id) {
-            prod.clone()
-        } else {
-            panic!("No product with id {}", request.id)
-        }
+        let result = request.id.into_ppr(PrivacyPureRegion::new(|id: String| {
+            if let Some(prod) = self.catalog.iter().find(|prod| prod.id == id) {
+                Some(prod.clone())
+            } else {
+                None
+            }
+        }));
+        Product::from(result.fold_in().unwrap())
     }
 
     async fn search_products(
@@ -68,21 +72,24 @@ impl ProductCatalogService for ProductCatalogServer {
         _context: tarpc::context::Context,
         request: productcatalog_service::types::SearchProductRequest,
     ) -> productcatalog_service::types::SearchProductResponse {
-        let prods = self.catalog
-            .iter()
-            .filter(|prod| {
-                prod
-                    .name
-                    .to_lowercase()
-                    .contains(&request.query.to_lowercase())
-                    || prod
-                        .description
+        let products = request.query.into_ppr(PrivacyPureRegion::new(|query: String| {
+            self.catalog
+                .iter()
+                .filter(|prod| {
+                    prod
+                        .name
                         .to_lowercase()
-                        .contains(&request.query.to_lowercase())
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        SearchProductResponse { results: prods }
+                        .contains(&query.to_lowercase())
+                        || prod
+                            .description
+                            .to_lowercase()
+                            .contains(&query.to_lowercase())
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        }));
+
+        SearchProductResponse { results: products }
     }
 }
 

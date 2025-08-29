@@ -8,6 +8,9 @@ use ad_service::{
 
 use futures::StreamExt;
 use std::net::{IpAddr, Ipv4Addr};
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
+use alohomora::pure::PrivacyPureRegion;
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -83,18 +86,20 @@ impl AdService for AdServer {
         _context: ::tarpc::context::Context,
         request: ad_service::types::AdRequest,
     ) -> ad_service::types::AdResponse {
-        println!("Getting ads based on zipcode {:06}", request.zip_code);
+        println!("Getting ads based on zipcode <BOXED>");
         let ads = request
             .context_keys
-            .iter()
-            .map(|context_key| {
-                self.ads_map
-                    .get_vec(context_key)
-                    .cloned()
-                    .unwrap_or_else(|| Vec::new())
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+            .into_ppr(PrivacyPureRegion::new(|v: Vec<String>| {
+                v.iter()
+                    .map(|context_key| {
+                        self.ads_map
+                            .get_vec(context_key)
+                            .cloned()
+                            .unwrap_or_else(|| Vec::new())
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+            }));
 
         AdResponse { ads }
     }

@@ -1,14 +1,14 @@
+use alohomora::bbox::{BBox, BBoxRender};
+use alohomora::policy::NoPolicy;
 use checkout_service::types::{Address, CreditCardInfo, OrderResult};
 use chrono::Datelike;
 use currency_service::{money::sum, types::Money};
 use productcatalog_service::types::Product;
-use rocket::{
-    form::Form,
-    http::{ContentType, CookieJar},
-    response::Redirect,
-    route, uri, FromForm,
-};
-use rocket_dyn_templates::Template;
+
+use alohomora::rocket::{get, post};
+use alohomora::rocket::{BBoxForm, BBoxRedirect, FromBBoxForm, BBoxTemplate, BBoxCookieJar};
+
+use either::Either;
 
 use crate::{
     middleware::SharedRenderingContext,
@@ -23,33 +23,35 @@ use crate::{
     utils::{cart_size, current_user_currency, user_session_id},
 };
 
-#[derive(serde::Serialize)]
+#[derive(BBoxRender)]
 struct CartItemView {
     item: Product,
-    quantity: i32,
+    quantity: BBox<i32, NoPolicy>,
     price: Money,
 }
 
-#[derive(serde::Serialize)]
+#[derive(BBoxRender)]
 struct ViewCartContext {
     currencies: Vec<String>,
     recommendations: Vec<Product>,
-    cart_size: i32,
+    cart_size: BBox<i32, NoPolicy>,
     shipping_cost: Money,
     show_currency: bool,
     total_cost: Money,
     items: Vec<CartItemView>,
-    expiration_years: Vec<i32>,
+    expiration_years: Vec<BBox<i32, NoPolicy>>,
 }
 
-#[route(GET, uri = "/")]
+
+
+#[get("/")]
 pub async fn view_cart(
     template_context: SharedRenderingContext,
-    cookie_jar: &CookieJar<'_>,
-) -> (ContentType, Template) {
+    cookie_jar: BBoxCookieJar<'_, '_>,
+) -> BBoxTemplate {
     let t_ctx = tarpc::context::current();
     let supported_currencies = get_currencies(t_ctx).await;
-    let current_user_currency = current_user_currency(cookie_jar);
+    let current_user_currency = current_user_currency(&cookie_jar);
     let session_id = user_session_id(&cookie_jar);
     let cart = get_cart(t_ctx, session_id.clone()).await;
 
@@ -62,6 +64,17 @@ pub async fn view_cart(
         .map(|item| &item.product_id)
         .cloned()
         .collect::<Vec<_>>();
+
+    let item_ids: BBox<Vec<_>, _> = item_ids.into();
+    let item_ids = match item_ids.specialize_option_policy() {
+        Either::Left(no_policy) => {
+            // Vector is empty and there is no policy.
+            // Create one.
+            BBox::new(Vec::new(), NoPolicy {})
+        },
+        Either::Right(policy_exists) => policy_exists,
+    };
+
     // for id in item_ids {
     //     products.push(get_product(t_ctx, id).await);
     // }
@@ -79,8 +92,8 @@ pub async fn view_cart(
 
     let mut total_price = Money {
         currency_code: current_user_currency.clone(),
-        units: 0,
-        nanos: 0,
+        units: BBox::new(0, NoPolicy {}),
+        nanos: BBox::new(0, NoPolicy {}),
     };
 
     for item in cart.items {
@@ -88,7 +101,7 @@ pub async fn view_cart(
         let localized_price =
             convert_currency(t_ctx, prod.price_usd.clone(), current_user_currency.clone()).await;
         let total_article_price =
-            currency_service::money::slow_multiply(&localized_price, item.quantity);
+            currency_service::money::slow_multiply(&localized_price, item.quantity.clone());
 
         //TODO: Replace sum and multiply as a method of a mutable price instead of floating
         //functions or at least operate on mutable references to not have to clone and move everything
@@ -114,58 +127,54 @@ pub async fn view_cart(
         show_currency: true,
         total_cost: total_price,
         items: cart_item_views,
-        expiration_years: (0..=4).map(|i| current_year + i).collect(),
+        expiration_years: (0..=4).map(|i| BBox::new(current_year + i, NoPolicy {})).collect(),
     };
 
     let total_context = template_context.extend_with_handler_context(local_context);
-
-    (
-        ContentType::HTML,
-        Template::render("cart.html.tera", total_context),
-    )
+    BBoxTemplate::render::<_, _, ()>("cart.html.tera", &total_context, todo!())
 }
 
-#[derive(FromForm)]
+#[derive(FromBBoxForm)]
 pub struct AddToCartForm {
-    quantity: i32,
-    product_id: String,
+    quantity: BBox<i32, NoPolicy>,
+    product_id: BBox<String, NoPolicy>,
 }
 
-#[route(POST, uri = "/", data = "<cart_form>")]
-pub async fn add_to_cart(cookie_jar: &CookieJar<'_>, cart_form: Form<AddToCartForm>) -> Redirect {
+#[post("/", data = "<cart_form>")]
+pub async fn add_to_cart(cookie_jar: BBoxCookieJar<'_, '_>, cart_form: BBoxForm<AddToCartForm>) -> BBoxRedirect {
     println!("GETTING TO ADD");
     //TODO: Validate the form
     let t_ctx = tarpc::context::current();
     let product = get_product(t_ctx, cart_form.product_id.clone()).await;
-    let session_id = user_session_id(cookie_jar);
-    add_item(t_ctx, session_id, product.id, cart_form.quantity).await;
-    Redirect::found(uri!("/cart"))
+    let session_id = user_session_id(&cookie_jar);
+    add_item(t_ctx, session_id, product.id, cart_form.into_inner().quantity).await;
+    BBoxRedirect::to2("/cart")
 }
 
-#[route(POST, uri = "/empty")]
-pub async fn empty_cart(cookie_jar: &CookieJar<'_>) -> Redirect {
+#[post("/empty")]
+pub async fn empty_cart(cookie_jar: BBoxCookieJar<'_, '_>) -> BBoxRedirect {
     let t_ctx = tarpc::context::current();
-    let session_id = user_session_id(cookie_jar);
+    let session_id = user_session_id(&cookie_jar);
     delete_cart(t_ctx, session_id).await;
-    Redirect::found(uri!("/"))
+    BBoxRedirect::to2("/")
 }
 
-#[derive(FromForm)]
+#[derive(FromBBoxForm)]
 pub struct CheckoutForm {
-    email: String,
-    street_address: String,
-    zip_code: i64,
-    city: String,
-    state: String,
-    country: String,
-    credit_card_number: String,
-    credit_card_expiration_month: i32,
-    credit_card_expiration_year: i32,
-    credit_card_cvv: i32,
+    email: BBox<String, NoPolicy>,
+    street_address: BBox<String, NoPolicy>,
+    zip_code: BBox<i32, NoPolicy>,
+    city: BBox<String, NoPolicy>,
+    state: BBox<String, NoPolicy>,
+    country: BBox<String, NoPolicy>,
+    credit_card_number: BBox<String, NoPolicy>,
+    credit_card_expiration_month: BBox<i32, NoPolicy>,
+    credit_card_expiration_year: BBox<i32, NoPolicy>,
+    credit_card_cvv: BBox<i32, NoPolicy>,
     store_payment_info: bool
 }
 
-#[derive(serde::Serialize)]
+#[derive(BBoxRender)]
 struct OrderRenderingContext{
     show_currency: bool,
     currencies: Vec<String>,
@@ -174,20 +183,20 @@ struct OrderRenderingContext{
     recommendations: Vec<Product>
 }
 
-#[route(POST, uri = "/checkout", data = "<checkout_form>")]
+#[post("/checkout", data = "<checkout_form>")]
 pub async fn checkout(
-    checkout_form: Form<CheckoutForm>,
-    cookie_jar: &CookieJar<'_>,
+    checkout_form: BBoxForm<CheckoutForm>,
+    cookie_jar: BBoxCookieJar<'_, '_>,
     template_context: SharedRenderingContext
-) -> (ContentType, Template) {
-    let user_currency = current_user_currency(cookie_jar);
-    let session_id = user_session_id(cookie_jar);
+) -> BBoxTemplate {
+    let user_currency = current_user_currency(&cookie_jar);
+    let session_id = user_session_id(&cookie_jar);
     let t_ctx = tarpc::context::current();
     let cc = CreditCardInfo {
         credit_card_number: checkout_form.credit_card_number.clone(),
-        credit_card_expiration_month: checkout_form.credit_card_expiration_month,
-        credit_card_expiration_year: checkout_form.credit_card_expiration_year,
-        credit_card_cvv: checkout_form.credit_card_cvv,
+        credit_card_expiration_month: checkout_form.credit_card_expiration_month.clone(),
+        credit_card_expiration_year: checkout_form.credit_card_expiration_year.clone(),
+        credit_card_cvv: checkout_form.credit_card_cvv.clone(),
     };
 
     let address = Address {
@@ -195,7 +204,7 @@ pub async fn checkout(
         city: checkout_form.city.clone(),
         state: checkout_form.state.clone(),
         country: checkout_form.country.clone(),
-        zip_code: checkout_form.zip_code as i32,
+        zip_code: checkout_form.zip_code.clone(),
     };
 
     let order = rpc_checkout(
@@ -209,12 +218,12 @@ pub async fn checkout(
     )
     .await;
 
-    let recommendations = list_recommendations(t_ctx, session_id.clone(), Vec::new()).await;
+    let recommendations = list_recommendations(t_ctx, session_id.clone(), BBox::new(Vec::new(), NoPolicy {})).await;
 
     let items = order.items.clone();
     let total_price = items
         .iter()
-        .map(|item| currency_service::money::slow_multiply(&item.cost, item.item.quantity))
+        .map(|item| currency_service::money::slow_multiply(&item.cost, item.item.quantity.clone()))
         .fold(order.shipping_cost.clone(), |acc, e| sum(&acc, &e).expect("Couldn't sum"));
 
     let currencies = get_currencies(t_ctx).await;
@@ -229,9 +238,5 @@ pub async fn checkout(
     };
 
     let total_context = template_context.extend_with_handler_context(local_context);
-
-    (ContentType::HTML, Template::render("order.html.tera", total_context))
-
-
-
+    BBoxTemplate::render::<_, _, ()>("order.html.tera", &total_context, todo!())
 }

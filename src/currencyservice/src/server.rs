@@ -3,6 +3,8 @@ use currency_service::{self, types::GetSupportedCurrenciesResponse};
 use futures::StreamExt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
+use alohomora::policy::AnyPolicyDyn;
+use alohomora::pure::{execute_pure, PrivacyPureRegion};
 use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
@@ -11,6 +13,7 @@ use tokio::net::TcpListener;
 use crate::currency_utils::convert::ConversionTable;
 use futures::Future;
 use tarpc::serde_transport::new as new_transport;
+use currency_service::types::Money;
 
 mod currency_utils;
 
@@ -25,8 +28,14 @@ impl currency_service::service::CurrencyService for CurrencyServer {
         _context: tarpc::context::Context,
         conversion_request: currency_service::types::CurrencyConversionRequest,
     ) -> currency_service::types::Money {
-        self.currency_converter
-            .convert(conversion_request.from, conversion_request.to_code)
+        let result = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
+            conversion_request,
+            PrivacyPureRegion::new(|conversion_request: currency_service::types::CurrencyConversionRequestOut| {
+                self.currency_converter
+                    .convert(conversion_request.from, conversion_request.to_code)
+            })
+        ).unwrap();
+        Money::from(result.specialize_policy().unwrap())
     }
 
     async fn get_supported_currencies(

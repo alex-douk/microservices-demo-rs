@@ -2,6 +2,8 @@ use email_service::service::EmailServiceClient;
 use email_service::types::OrderResult;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -23,7 +25,7 @@ pub(super) async fn initialize_email_client() {
     }
 }
 
-pub async fn send_order_confirmation(ctx: tarpc::context::Context, email: String, order_result: OrderResult) {
+pub async fn send_order_confirmation(ctx: tarpc::context::Context, email: BBox<String, NoPolicy>, order_result: OrderResult) {
     match EMAIL_CLIENT.get() {
         None => unreachable!("Email Client should have been initialized before calling its API"),
         Some(email_client) => email_client

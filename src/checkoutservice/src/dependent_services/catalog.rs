@@ -4,6 +4,8 @@ use productcatalog_service::service::ProductCatalogServiceClient;
 use productcatalog_service::types::Product;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
+use alohomora::bbox::BBox;
+use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
@@ -25,7 +27,7 @@ pub(super) async fn initialize_catalog_client() {
     }
 }
 
-pub async fn get_product(ctx: tarpc::context::Context, product_id: String) -> Product {
+pub async fn get_product(ctx: tarpc::context::Context, product_id: BBox<String, NoPolicy>) -> Product {
     match CATALOG_CLIENT.get() {
         None => unreachable!("Catalog Client should have been initialized before calling its API"),
         Some(catalog_client) => catalog_client
@@ -41,7 +43,7 @@ pub async fn get_product(ctx: tarpc::context::Context, product_id: String) -> Pr
 pub async fn prepare_order(
     ctx: tarpc::context::Context,
     items: Vec<CartItem>,
-    user_currency: String,
+    user_currency: BBox<String, NoPolicy>,
 ) -> Vec<OrderItem> {
     let mut order = Vec::with_capacity(items.len());
     for item in items.into_iter() {
