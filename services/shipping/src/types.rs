@@ -1,28 +1,29 @@
 use alohomora::bbox::BBox;
 use alohomora::policy::NoPolicy;
 use alohomora::SesameType;
+use tahini_tarpc::TahiniType;
 use tarpc::serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, Deserialize, Debug, Clone)]
 pub struct GetQuoteRequest {
     pub address: Address,
     pub items: Vec<CartItem>
 }
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, Deserialize, Debug, Clone)]
 pub struct GetQuoteResponse {
     pub cost_usd: Money
 }
 
 
-#[derive(Serialize, Deserialize, Debug, Clone, SesameType)]
+#[derive(TahiniType, Deserialize, Debug, Clone, SesameType)]
 pub struct ShipOrderRequest {
     pub address: Address,
     pub items: Vec<CartItem>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, Deserialize, Debug, Clone)]
 pub struct ShipOrderResponse {
     pub tracking_id: BBox<String, NoPolicy>,
 }

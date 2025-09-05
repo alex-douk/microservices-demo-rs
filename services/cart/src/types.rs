@@ -1,33 +1,34 @@
 use alohomora::bbox::BBox;
 use alohomora::policy::NoPolicy;
 use alohomora::SesameType;
-use tarpc::serde::{Deserialize, Serialize};
+use tahini_tarpc::TahiniType;
+use tahini_tarpc::{TahiniDeserialize, TahiniSerialize};
 
 
 pub use microservices_core_types::CartItem;
-// #[derive(Serialize, Deserialize, Debug, Clone)]
+// #[derive(Serialize, TahiniDeserialize, Debug, Clone)]
 // pub struct CartItem {
 //     pub product_id: String,
 //     pub quantity: i32,
 // }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, TahiniDeserialize, Debug, Clone)]
 pub struct AddItemRequest {
     pub user_id: BBox<String, NoPolicy>,
     pub item: CartItem,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, TahiniDeserialize, Debug, Clone)]
 pub struct EmptyCartRequest {
     pub user_id: BBox<String, NoPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, TahiniDeserialize, Debug, Clone)]
 pub struct GetCartRequest {
     pub user_id: BBox<String, NoPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, SesameType)]
+#[derive(TahiniType, TahiniDeserialize, Debug, Clone, SesameType)]
 #[alohomora_out_type(to_derive = [Clone])]
 pub struct Cart {
     pub user_id: BBox<String, NoPolicy>,
@@ -43,5 +44,5 @@ impl Cart {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniSerialize, TahiniDeserialize, Debug)]
 pub struct Empty;

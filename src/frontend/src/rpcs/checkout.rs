@@ -1,23 +1,24 @@
-use checkout_service::service::CheckoutServiceClient;
+use checkout_service::service::TahiniCheckoutServiceClient;
 use checkout_service::types::{Address, CreditCardInfo, PlaceOrderRequest};
+use microservices_core_types::policies::EmailAddressPolicy;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 use alohomora::bbox::BBox;
 use alohomora::policy::NoPolicy;
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_client_transport as new_transport;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
 
 static CHECKOUT_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50059);
-static CHECKOUT_CLIENT: OnceLock<CheckoutServiceClient> = OnceLock::new();
+static CHECKOUT_CLIENT: OnceLock<TahiniCheckoutServiceClient> = OnceLock::new();
 
 pub(super) async fn initialize_checkout_client() {
     println!("INTIIALIZNG CHECKOUT SERVICE");
     let codec_builder = LengthDelimitedCodec::builder();
     let stream = TcpStream::connect(&CHECKOUT_ADDRESS).await.unwrap();
     let transport = new_transport(codec_builder.new_framed(stream), Json::default());
-    let client = CheckoutServiceClient::new(Default::default(), transport).spawn();
+    let client = TahiniCheckoutServiceClient::new(Default::default(), transport).spawn().await;
     if let Err(_) = CHECKOUT_CLIENT.set(client) {
         panic!("Client connection already exists");
     }
@@ -26,7 +27,7 @@ pub(super) async fn initialize_checkout_client() {
 pub async fn checkout(
     ctx: tarpc::context::Context,
     address: Address,
-    email: BBox<String, NoPolicy>,
+    email: BBox<String, EmailAddressPolicy>,
     cc: CreditCardInfo,
     session_id: BBox<String, NoPolicy>,
     currency: BBox<String, NoPolicy>,

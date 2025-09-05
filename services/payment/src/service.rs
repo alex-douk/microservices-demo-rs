@@ -1,6 +1,7 @@
-use crate::types::{ChargeRequest, ChargeResponse, CreditCardError, };
+use crate::types::{ChargeRequest, ChargeResponse, PaymentChargeRequest};
+use tahini_tarpc::tahini_service;
 
-#[tarpc::service]
+#[tahini_service(domain=company)]
 pub trait PaymentService {
-    async fn charge(charge: ChargeRequest) -> Result<ChargeResponse, CreditCardError>;
+    async fn charge(charge: PaymentChargeRequest) -> Result<ChargeResponse, String>;
 }

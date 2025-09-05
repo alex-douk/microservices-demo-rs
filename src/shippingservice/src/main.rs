@@ -19,7 +19,9 @@ use std::{
 use alohomora::bbox::BBox;
 use alohomora::policy::{AnyPolicyDyn, NoPolicy};
 use alohomora::pure::{execute_pure, PrivacyPureRegion};
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_server_transport as new_transport;
+use tahini_tarpc::server::{TahiniBaseChannel, TahiniChannel};
+use hoodini_server::CLIENT_MAP;
 use shipping_service::types::{AddressOut, ShipOrderRequestOut};
 use crate::db::{backend::MySqlBackend, config::Config};
 
@@ -74,7 +76,7 @@ impl ShippingService for ShippingServer {
         let money = Money {
             currency_code: BBox::new("USD".to_string(), NoPolicy {}),
             units: BBox::new(quote.dollars as i64, NoPolicy {}),
-            nanos: BBox::new((quote.cents * 10_000_000) as i32, NoPolicy {}),
+            nanos: BBox::new((quote.cents * 10_000_000) as i64, NoPolicy {}),
         };
         GetQuoteResponse { cost_usd: money }
     }
@@ -129,8 +131,8 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
         let framed = codec_builder.new_framed(stream);
-        let transport = new_transport(framed, Json::default());
-        let fut = BaseChannel::with_defaults(transport)
+        let transport = new_transport(framed, Json::default(), (*CLIENT_MAP).clone());
+        let fut = TahiniBaseChannel::with_defaults(transport)
             .execute(server.clone().serve())
             .for_each(wait_upon);
         tokio::spawn(fut);

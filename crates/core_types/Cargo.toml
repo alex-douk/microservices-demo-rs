@@ -9,6 +9,8 @@ edition.workspace = true
 [dependencies]
 serde = { version = "1.0.219", features = ["derive", "serde_derive"] }
 alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }
+tahini_tarpc = {git = "https://github.com/alex-douk/tahini_lib", branch = "standalone_tahini", features = ["derive"]}
+rocket = { git = "https://github.com/KinanBab/Rocket.git", branch = "main", features = ["json"]}
 
 
 [lib]

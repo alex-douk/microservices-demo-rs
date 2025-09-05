@@ -36,8 +36,8 @@ pub fn cart_size(cart: &Vec<CartItem>) -> BBox<i32, NoPolicy> {
         |acc, e| {
             let sum = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
                 (acc, e.clone()),
-                PrivacyPureRegion::new(|(acc, e): (i32, i32)| {
-                    acc + e
+                PrivacyPureRegion::new(|(acc, e): (i32, i64)| {
+                    acc + e as i32
                 })
             ).unwrap();
             sum.specialize_policy().unwrap()

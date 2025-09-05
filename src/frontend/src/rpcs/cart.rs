@@ -43,7 +43,7 @@ pub async fn delete_cart(ctx: tarpc::context::Context, user_id: BBox<String, NoP
     }
 }
 
-pub async fn add_item(ctx: tarpc::context::Context, user_id: BBox<String, NoPolicy>, product_id: BBox<String, NoPolicy>, quantity: BBox<i32, NoPolicy>) {
+pub async fn add_item(ctx: tarpc::context::Context, user_id: BBox<String, NoPolicy>, product_id: BBox<String, NoPolicy>, quantity: BBox<i64, NoPolicy>) {
     let item =  CartItem {
         product_id,
         quantity

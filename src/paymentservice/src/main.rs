@@ -4,7 +4,8 @@ mod validate;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use payment_service::service::PaymentService;
-use payment_service::types::{ChargeResponse, CreditCardInfoOut};
+use payment_service::types::{ChargeResponse, CreditCardInfoOut, PaymentCreditCardInfoOut};
+use tahini_tarpc::server::TahiniBaseChannel;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use alohomora::bbox::BBox;
@@ -16,9 +17,12 @@ use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpListener;
 use uuid::Uuid;
+use tahini_tarpc::server::TahiniChannel;
 
 use futures::Future;
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_server_transport as new_transport;
+
+use hoodini_server::*;
 
 use crate::db::backend::MySqlBackend;
 use crate::db::config::Config;
@@ -47,14 +51,14 @@ impl PaymentService for PaymentServer {
     async fn charge(
         self,
         _context: tarpc::context::Context,
-        charge: payment_service::types::ChargeRequest,
-    ) -> Result<payment_service::types::ChargeResponse, payment_service::types::CreditCardError>
+        charge: payment_service::types::PaymentChargeRequest,
+    ) -> Result<payment_service::types::ChargeResponse, String>
     {
         // This is a critical region because in reality, it speaks to a remote payment processor.
         let details = execute_pcr::<dyn AnyPolicyCloneDyn, _, _, _, _>(
             charge.credit_card.clone(),
             PrivacyCriticalRegion::new(
-                |credit_card: CreditCardInfoOut, p, _: ()| {
+                |credit_card: PaymentCreditCardInfoOut, p, _: ()| {
                     BBox::new(validate::validate_card(credit_card), p)
                 },
                 Signature {
@@ -80,7 +84,8 @@ impl PaymentService for PaymentServer {
          */
 
         let tx_id = BBox::new(Uuid::new_v4().to_string(), NoPolicy {});
-        if charge.save_credit_info {
+
+        if charge.credit_card.credit_card_number.policy().store_payment_info {
             let mut db_conn = self.0.lock().await;
             db_conn.insert(
                 "payments",
@@ -116,8 +121,8 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
         let framed = codec_builder.new_framed(stream);
-        let transport = new_transport(framed, Json::default());
-        let fut = BaseChannel::with_defaults(transport)
+        let transport = new_transport(framed, Json::default(), (*CLIENT_MAP).clone());
+        let fut = TahiniBaseChannel::with_defaults(transport)
             .execute(server.clone().serve())
             .for_each(wait_upon);
         tokio::spawn(fut);

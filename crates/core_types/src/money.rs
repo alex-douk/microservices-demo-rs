@@ -5,9 +5,9 @@ use alohomora::policy::{AnyPolicyDyn, NoPolicy, Specializable};
 use alohomora::pure::{execute_pure, PrivacyPureRegion};
 use crate::{Money, MoneyOut};
 
-const MIN_NANO: i32 = -999_999_999;
-const MAX_NANO: i32 = 999_999_999;
-const NANOS_MOD: i32 = 1_000_000_000;
+const MIN_NANO: i64 = -999_999_999;
+const MAX_NANO: i64 = 999_999_999;
+const NANOS_MOD: i64 = 1_000_000_000;
 
 #[derive(Debug, Clone)]
 pub enum MoneyErrors {
@@ -28,23 +28,23 @@ impl Display for MoneyErrors {
 
 impl std::error::Error for MoneyErrors {}
 
-fn sign_matches(units: i64, nanos: i32) -> bool {
+fn sign_matches(units: i64, nanos: i64) -> bool {
     nanos == 0 || units == 0 || (nanos < 0) == (units < 0)
 }
 
-fn valid_nanos(nanos: i32) -> bool {
+fn valid_nanos(nanos: i64) -> bool {
     MIN_NANO <= nanos && nanos <= MAX_NANO
 }
 
-fn is_valid(units: i64, nanos: i32) -> bool {
+fn is_valid(units: i64, nanos: i64) -> bool {
     valid_nanos(nanos) && sign_matches(units, nanos)
 }
 
-fn is_positive(units: i64, nanos: i32) -> bool {
+fn is_positive(units: i64, nanos: i64) -> bool {
     is_valid(units, nanos) && units > 0 || (units == 0 && nanos > 0)
 }
 
-fn is_negative(units: i64, nanos: i32) -> bool {
+fn is_negative(units: i64, nanos: i64) -> bool {
     is_valid(units, nanos) && units < 0 || (units == 0 && nanos < 0)
 }
 
@@ -56,7 +56,7 @@ fn negate(m: Money) -> Money {
     Money {
         currency_code: m.currency_code,
         units: m.units.into_ppr(PrivacyPureRegion::new(|units: i64| -units)),
-        nanos: m.nanos.into_ppr(PrivacyPureRegion::new(|nanos: i32| -nanos)),
+        nanos: m.nanos.into_ppr(PrivacyPureRegion::new(|nanos: i64| -nanos)),
     }
 }
 
@@ -102,8 +102,8 @@ pub fn sum(l: &Money, r: &Money) -> Result<Money, MoneyErrors> {
     Ok(Money::from(result))
 }
 
-pub fn slow_multiply(m: &Money, n: BBox<i32, NoPolicy>) -> Money {
-    let result = n.into_ppr(PrivacyPureRegion::new(|n: i32| {
+pub fn slow_multiply(m: &Money, n: BBox<i64, NoPolicy>) -> Money {
+    let result = n.into_ppr(PrivacyPureRegion::new(|n: i64| {
         let mut out = m.clone();
         for _ in 0..n {
             out = sum(&out, &m).expect("Couldn't sum the value to its aggregator");

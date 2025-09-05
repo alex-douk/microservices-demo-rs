@@ -1,8 +1,10 @@
 use crate::types::{
     GetProductRequest, ListProductResponse, Product, SearchProductRequest, SearchProductResponse,
 };
+use tahini_tarpc::tahini_service;
 
-#[tarpc::service]
+
+#[tahini_service(domain=company)]
 pub trait ProductCatalogService {
     async fn list_products() -> ListProductResponse;
     async fn get_product(request: GetProductRequest) -> Product;

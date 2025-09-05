@@ -13,3 +13,5 @@ tokio = { version = "1.47.1", features = ["io-std", "io-util", "rt", "mio", "lib
 email_service = {version = "0.1.0", path = "../../services/email"}
 minijinja = "2.11.0"
 alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }
+tahini_tarpc = {git = "https://github.com/alex-douk/tahini_lib", branch = "standalone_tahini"}
+hoodini_server = {git = "https://github.com/alex-douk/tahini_lib", branch = "standalone_tahini", features = ["sidecar"]}

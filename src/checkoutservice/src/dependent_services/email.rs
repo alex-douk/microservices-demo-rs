@@ -1,5 +1,6 @@
-use email_service::service::EmailServiceClient;
+use email_service::service::TahiniEmailServiceClient;
 use email_service::types::OrderResult;
+use microservices_core_types::policies::EmailAddressPolicy;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 use alohomora::bbox::BBox;
@@ -8,24 +9,24 @@ use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
 
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_client_transport as new_transport;
 
 
 static EMAIL_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50061);
-static EMAIL_CLIENT: OnceLock<EmailServiceClient > = OnceLock::new();
+static EMAIL_CLIENT: OnceLock<TahiniEmailServiceClient > = OnceLock::new();
 
 
 pub(super) async fn initialize_email_client() {
     let codec_builder = LengthDelimitedCodec::builder();
     let stream = TcpStream::connect(&EMAIL_ADDRESS).await.unwrap();
     let transport = new_transport(codec_builder.new_framed(stream), Json::default());
-    let client = EmailServiceClient::new(Default::default(), transport).spawn();
+    let client = TahiniEmailServiceClient::new(Default::default(), transport).spawn().await;
     if let Err(_) = EMAIL_CLIENT.set(client) {
         panic!("Client connection already exists");
     }
 }
 
-pub async fn send_order_confirmation(ctx: tarpc::context::Context, email: BBox<String, NoPolicy>, order_result: OrderResult) {
+pub async fn send_order_confirmation(ctx: tarpc::context::Context, email: BBox<String, EmailAddressPolicy>, order_result: OrderResult) {
     match EMAIL_CLIENT.get() {
         None => unreachable!("Email Client should have been initialized before calling its API"),
         Some(email_client) => email_client

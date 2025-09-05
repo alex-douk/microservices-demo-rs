@@ -1,6 +1,6 @@
 use checkout_service::types::CreditCardInfo;
-use payment_service::service::PaymentServiceClient;
-use payment_service::types::{CreditCardError, Money};
+use payment_service::service::TahiniPaymentServiceClient;
+use payment_service::types::Money;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 use alohomora::bbox::BBox;
@@ -9,16 +9,16 @@ use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
 
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_client_transport as new_transport;
 
 static PAYMENT_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50060);
-static PAYMENT_CLIENT: OnceLock<PaymentServiceClient> = OnceLock::new();
+static PAYMENT_CLIENT: OnceLock<TahiniPaymentServiceClient> = OnceLock::new();
 
 pub(super) async fn initialize_payment_client() {
     let codec_builder = LengthDelimitedCodec::builder();
     let stream = TcpStream::connect(&PAYMENT_ADDRESS).await.unwrap();
     let transport = new_transport(codec_builder.new_framed(stream), Json::default());
-    let client = PaymentServiceClient::new(Default::default(), transport).spawn();
+    let client = TahiniPaymentServiceClient::new(Default::default(), transport).spawn().await;
     if let Err(_) = PAYMENT_CLIENT.set(client) {
         panic!("Client connection already exists");
     }
@@ -28,8 +28,8 @@ pub async fn charge_card(
     ctx: tarpc::context::Context,
     amount: Money,
     card: CreditCardInfo,
-    save_credit_info: bool
-) -> Result<BBox<String, NoPolicy>, CreditCardError> {
+    _save_credit_info: bool
+) -> Result<BBox<String, NoPolicy>, String> {
     match PAYMENT_CLIENT.get() {
         Some(payment_client) => {
             // let credit_card: PaymentCreditCardInfo = PaymentCreditCardInfo {
@@ -44,7 +44,6 @@ pub async fn charge_card(
                     payment_service::types::ChargeRequest {
                         amount,
                         credit_card: card,
-                        save_credit_info
                     },
                 )
                 .await

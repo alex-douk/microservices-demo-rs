@@ -1,6 +1,7 @@
 use cart_service::types::CartItem;
 use email_service::types::OrderItem;
-use productcatalog_service::service::ProductCatalogServiceClient;
+use microservices_core_types::policies::CartPolicy;
+use productcatalog_service::service::TahiniProductCatalogServiceClient;
 use productcatalog_service::types::Product;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
@@ -10,24 +11,24 @@ use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
 
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_client_transport as new_transport;
 
 use crate::dependent_services::currency::convert_currency;
 
 static CATALOG_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50053);
-static CATALOG_CLIENT: OnceLock<ProductCatalogServiceClient> = OnceLock::new();
+static CATALOG_CLIENT: OnceLock<TahiniProductCatalogServiceClient> = OnceLock::new();
 
 pub(super) async fn initialize_catalog_client() {
     let codec_builder = LengthDelimitedCodec::builder();
     let stream = TcpStream::connect(&CATALOG_ADDRESS).await.unwrap();
     let transport = new_transport(codec_builder.new_framed(stream), Json::default());
-    let client = ProductCatalogServiceClient::new(Default::default(), transport).spawn();
+    let client = TahiniProductCatalogServiceClient::new(Default::default(), transport).spawn().await;
     if let Err(_) = CATALOG_CLIENT.set(client) {
         panic!("Client connection already exists");
     }
 }
 
-pub async fn get_product(ctx: tarpc::context::Context, product_id: BBox<String, NoPolicy>) -> Product {
+pub async fn get_product(ctx: tarpc::context::Context, product_id: BBox<String, CartPolicy>) -> Product {
     match CATALOG_CLIENT.get() {
         None => unreachable!("Catalog Client should have been initialized before calling its API"),
         Some(catalog_client) => catalog_client

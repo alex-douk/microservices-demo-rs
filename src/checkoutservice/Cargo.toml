@@ -23,6 +23,8 @@ mysql = "21.0.2"
 mysql_common = "0.29"
 toml = "0.9.5"
 alohomora = { git = "https://github.com/brownsys/Sesame.git", branch = "tahini-dev", default-features = false, features = ["derive"] }
+tahini_tarpc = {git = "https://github.com/alex-douk/tahini_lib.git", branch = "standalone_tahini"}
+hoodini_server = {git = "https://github.com/alex-douk/tahini_lib.git", branch = "standalone_tahini", features = ["sidecar"]}
 
 [patch.crates-io]
 funty = { version = "1.2.0", git = "https://github.com/bitvecto-rs/funty/", rev = "7ef0d890fbcd8b3def1635ac1a877fc298488446" }

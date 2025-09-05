@@ -3,17 +3,18 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::{fs::File, io::Read};
 use alohomora::policy::AnyPolicyDyn;
 use alohomora::pure::{execute_pure, PrivacyPureRegion};
-use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpListener;
+use hoodini_server::CLIENT_MAP;
+use tahini_tarpc::server::{TahiniChannel, TahiniBaseChannel};
 
 use futures::Future;
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_server_transport as new_transport;
 
-use email_service::{service::EmailService, types::SendOrderConfirmationRequest};
+use email_service::{service::EmailService};
 use minijinja::{context, Environment};
-use email_service::types::OrderResultOut;
+use email_service::types::{OrderResultOut, UsableSendOrderConfirmationRequest};
 
 static SERVER_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50061);
 
@@ -24,7 +25,7 @@ impl EmailService for EmailServer {
     async fn send_order_confirmation(
         self,
         _context: tarpc::context::Context,
-        confirmation_request: SendOrderConfirmationRequest,
+        confirmation_request: UsableSendOrderConfirmationRequest,
     ) {
         let mut env = Environment::new();
         let mut template_str = String::new();
@@ -69,8 +70,9 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
         let framed = codec_builder.new_framed(stream);
-        let transport = new_transport(framed, Json::default());
-        let fut = BaseChannel::with_defaults(transport)
+        let transport = new_transport(framed, Json::default(), (*CLIENT_MAP).clone());
+
+        let fut = TahiniBaseChannel::with_defaults(transport)
             .execute(server.clone().serve())
             .for_each(wait_upon);
         tokio::spawn(fut);

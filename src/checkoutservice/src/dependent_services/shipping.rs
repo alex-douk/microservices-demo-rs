@@ -1,7 +1,7 @@
 use cart_service::types::CartItem;
 use checkout_service::types::Address;
 use email_service::types::Money;
-use shipping_service::service::ShippingServiceClient;
+use shipping_service::service::TahiniShippingServiceClient;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::OnceLock;
 use alohomora::bbox::BBox;
@@ -9,17 +9,16 @@ use alohomora::policy::NoPolicy;
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpStream;
-
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_client_transport as new_transport;
 
 static SHIPPING_ADDRESS: (IpAddr, u16) = (IpAddr::V4(Ipv4Addr::LOCALHOST), 50058);
-static SHIPPING_CLIENT: OnceLock<ShippingServiceClient> = OnceLock::new();
+static SHIPPING_CLIENT: OnceLock<TahiniShippingServiceClient> = OnceLock::new();
 
 pub(super) async fn initialize_shipping_client() {
     let codec_builder = LengthDelimitedCodec::builder();
     let stream = TcpStream::connect(&SHIPPING_ADDRESS).await.unwrap();
     let transport = new_transport(codec_builder.new_framed(stream), Json::default());
-    let client = ShippingServiceClient::new(Default::default(), transport).spawn();
+    let client = TahiniShippingServiceClient::new(Default::default(), transport).spawn().await;
     if let Err(_) = SHIPPING_CLIENT.set(client) {
         panic!("Client connection already exists");
     }

@@ -1,9 +1,11 @@
 use alohomora::bbox::{BBox, BBoxRender};
+use alohomora::context::Context;
 use alohomora::policy::NoPolicy;
 use checkout_service::types::{Address, CreditCardInfo, OrderResult};
 use chrono::Datelike;
 use currency_service::{money::sum, types::Money};
 use productcatalog_service::types::Product;
+use microservices_core_types::policies::{CreditCardPolicy, EmailAddressPolicy};
 
 use alohomora::rocket::{get, post};
 use alohomora::rocket::{BBoxForm, BBoxRedirect, FromBBoxForm, BBoxTemplate, BBoxCookieJar};
@@ -26,7 +28,7 @@ use crate::{
 #[derive(BBoxRender)]
 struct CartItemView {
     item: Product,
-    quantity: BBox<i32, NoPolicy>,
+    quantity: BBox<i64, NoPolicy>,
     price: Money,
 }
 
@@ -136,7 +138,7 @@ pub async fn view_cart(
 
 #[derive(FromBBoxForm)]
 pub struct AddToCartForm {
-    quantity: BBox<i32, NoPolicy>,
+    quantity: BBox<i64, NoPolicy>,
     product_id: BBox<String, NoPolicy>,
 }
 
@@ -161,16 +163,16 @@ pub async fn empty_cart(cookie_jar: BBoxCookieJar<'_, '_>) -> BBoxRedirect {
 
 #[derive(FromBBoxForm)]
 pub struct CheckoutForm {
-    email: BBox<String, NoPolicy>,
+    email: BBox<String, EmailAddressPolicy>,
     street_address: BBox<String, NoPolicy>,
-    zip_code: BBox<i32, NoPolicy>,
+    zip_code: BBox<i64, NoPolicy>,
     city: BBox<String, NoPolicy>,
     state: BBox<String, NoPolicy>,
     country: BBox<String, NoPolicy>,
-    credit_card_number: BBox<String, NoPolicy>,
-    credit_card_expiration_month: BBox<i32, NoPolicy>,
-    credit_card_expiration_year: BBox<i32, NoPolicy>,
-    credit_card_cvv: BBox<i32, NoPolicy>,
+    credit_card_number: BBox<String, CreditCardPolicy>,
+    credit_card_expiration_month: BBox<i32, CreditCardPolicy>,
+    credit_card_expiration_year: BBox<i32, CreditCardPolicy>,
+    credit_card_cvv: BBox<i32, CreditCardPolicy>,
     store_payment_info: bool
 }
 
@@ -238,5 +240,5 @@ pub async fn checkout(
     };
 
     let total_context = template_context.extend_with_handler_context(local_context);
-    BBoxTemplate::render::<_, _, ()>("order.html.tera", &total_context, todo!())
+    BBoxTemplate::render::<_, _, ()>("order.html.tera", &total_context, Context::empty())
 }

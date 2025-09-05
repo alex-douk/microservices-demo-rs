@@ -2,13 +2,14 @@ use productcatalog_service::service::ProductCatalogService;
 
 use futures::StreamExt;
 use productcatalog_service::types::{ListProductResponse, Product, ProductOut, SearchProductResponse};
-use tarpc::server::{BaseChannel, Channel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpListener;
 
 use futures::Future;
-use tarpc::serde_transport::new as new_transport;
+use tahini_tarpc::transport::new_tahini_server_transport as new_transport;
+use hoodini_server::CLIENT_MAP;
+use tahini_tarpc::server::{TahiniBaseChannel, TahiniChannel};
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -106,8 +107,8 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
         let framed = codec_builder.new_framed(stream);
-        let transport = new_transport(framed, Json::default());
-        let fut = BaseChannel::with_defaults(transport)
+        let transport = new_transport(framed, Json::default(), (*CLIENT_MAP).clone());
+        let fut = TahiniBaseChannel::with_defaults(transport)
             .execute(server.clone().serve())
             .for_each(wait_upon);
         tokio::spawn(fut);

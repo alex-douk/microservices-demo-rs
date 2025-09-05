@@ -9,13 +9,14 @@ use alohomora::bbox::BBox;
 use alohomora::pcr::{execute_pcr, PrivacyCriticalRegion, Signature};
 use alohomora::policy::{AnyPolicy, AnyPolicyDyn, NoPolicy};
 use alohomora::pure::{execute_pure, PrivacyPureRegion};
-use tarpc::server::{BaseChannel, Channel};
+use tahini_tarpc::server::{TahiniChannel, TahiniBaseChannel};
 use tarpc::tokio_serde::formats::Json;
 use tarpc::tokio_util::codec::LengthDelimitedCodec;
 use tokio::net::TcpListener;
 
 use futures::Future;
-use tarpc::serde_transport::new as new_transport;
+use hoodini_server::CLIENT_MAP;
+use tahini_tarpc::transport::new_tahini_server_transport as new_transport;
 
 #[derive(Clone)]
 struct CartServer {
@@ -116,7 +117,7 @@ impl CartService for CartServer {
                                 Some(old_item) => {
                                     old_item.quantity = execute_pure::<dyn AnyPolicyDyn, _, _, _>(
                                         (old_item.quantity.clone(), item.quantity),
-                                        PrivacyPureRegion::new(|(q1, q2): (i32, i32)| {
+                                        PrivacyPureRegion::new(|(q1, q2): (i64, i64)| {
                                             q1 + q2
                                         })
                                     ).unwrap().specialize_policy().unwrap();
@@ -164,8 +165,8 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
         let framed = codec_builder.new_framed(stream);
-        let transport = new_transport(framed, Json::default());
-        let fut = BaseChannel::with_defaults(transport)
+        let transport = new_transport(framed, Json::default(), (*CLIENT_MAP).clone());
+        let fut = TahiniBaseChannel::with_defaults(transport)
             .execute(server.clone().serve())
             .for_each(wait_upon);
         tokio::spawn(fut);

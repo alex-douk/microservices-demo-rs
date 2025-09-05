@@ -2,22 +2,24 @@ use alohomora::bbox::{BBox, BBoxRender};
 use alohomora::policy::NoPolicy;
 use alohomora::pure::PrivacyPureRegion;
 use alohomora::SesameType;
+use microservices_core_types::policies::CartPolicy;
+use tahini_tarpc::{TahiniTransformInto, TahiniType};
 use tarpc::serde::{Serialize, Deserialize};
 
 
-#[derive(Serialize, Deserialize, Debug, Clone, SesameType, BBoxRender)]
-#[alohomora_out_type(to_derive = [Serialize, Deserialize, Debug, Clone])]
+#[derive(TahiniType, Deserialize, Debug, Clone, SesameType, BBoxRender)]
+#[alohomora_out_type(to_derive = [Serialize, Deserialize, Debug, Clone, TahiniType])]
 pub struct Product {
-    pub id: BBox<String, NoPolicy>,
-    pub name: BBox<String, NoPolicy>,
-    pub description: BBox<String, NoPolicy>,
-    pub picture: BBox<String, NoPolicy>,
+    pub id: BBox<String, CartPolicy>,
+    pub name: BBox<String, CartPolicy>,
+    pub description: BBox<String, CartPolicy>,
+    pub picture: BBox<String, CartPolicy>,
     pub price_usd: Money,
-    pub categories : BBox<Vec<String>, NoPolicy>,
+    pub categories : BBox<Vec<String>, CartPolicy>,
 }
 
 impl Product {
-    pub fn from(out: BBox<ProductOut, NoPolicy>) -> Product {
+    pub fn from(out: BBox<ProductOut, CartPolicy>) -> Product {
         Product {
             id: out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.id)),
             name: out.clone().into_ppr(PrivacyPureRegion::new(|p: ProductOut| p.name)),
@@ -30,23 +32,29 @@ impl Product {
 }
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, Serialize, Deserialize, Debug, Clone)]
 pub struct ListProductResponse {
     pub products: Vec<ProductOut>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, Deserialize, Debug, Clone)]
 pub struct GetProductRequest {
-    pub id: BBox<String, NoPolicy>,
+    pub id: BBox<String, CartPolicy>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+impl TahiniTransformInto<GetProductRequest> for GetProductRequest {
+    fn transform_into(self, context: &tahini_tarpc::context::TahiniContext) -> Result<GetProductRequest, String> {
+        Ok(self)
+    }
+}
+
+#[derive(TahiniType, Serialize, Deserialize, Debug, Clone)]
 pub struct SearchProductRequest {
     pub query: BBox<String, NoPolicy>,
 }
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(TahiniType, Serialize, Deserialize, Debug, Clone)]
 pub struct SearchProductResponse {
     pub results: BBox<Vec<ProductOut>, NoPolicy>
 }

@@ -38,7 +38,7 @@ impl ConversionTable {
         MoneyOut {
             currency_code: to_code,
             units: dst_units.floor() as i64,
-            nanos: dst_nanos.floor() as i32,
+            nanos: dst_nanos.floor() as i64,
         }
     }
 
